@@ -1,3 +1,9 @@
+/**
+ * @file cpu.h
+ * @brief MIPS R3000 emulator (with cache and MMU)
+ * 
+ */
+
 #ifndef CPU_H
 #define CPU_H
 
