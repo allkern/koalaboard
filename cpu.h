@@ -109,6 +109,11 @@ struct __attribute__((__packed__)) r3000_t {
     r3000_bus_write8_t bus_write8;
     r3000_bus_query_access_cycles_t bus_query_access_cycles;
 
+    struct {
+        uint32_t lo;
+        uint32_t hi;
+    } tlb[64];
+
     void* bus_udata;
 
     uint32_t cop0_r[16];
@@ -229,6 +234,15 @@ int r3000_check_irq(r3000_t*);
 #define CAUSE_CPU       (0x0b << 2)
 #define CAUSE_OV        (0x0c << 2)
 
+#define TLBE_VPN   0xfffff000
+#define TLBE_ASID  0x00000fc0
+#define TLBE_PFN   0xfffff000
+#define TLBE_N     0x00000800
+#define TLBE_D     0x00000400
+#define TLBE_V     0x00000200
+#define TLBE_G     0x00000100
+#define MMU_ENOENT 0xffffffff
+
 void r3000_i_invalid(r3000_t*);
 
 // Primary
@@ -313,6 +327,10 @@ void r3000_i_bgezal(r3000_t*);
 void r3000_i_mfc0(r3000_t*);
 void r3000_i_mtc0(r3000_t*);
 void r3000_i_rfe(r3000_t*);
+void r3000_i_tlbp(r3000_t*);
+void r3000_i_tlbr(r3000_t*);
+void r3000_i_tlbwi(r3000_t*);
+void r3000_i_tlbwr(r3000_t*);
 
 // COP1
 void r3000_i_mfc1(r3000_t*);

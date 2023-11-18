@@ -42,9 +42,9 @@ static const r3000_instruction_t g_r3000_primary_table[] = {
 };
 
 static const r3000_instruction_t g_r3000_cop0_table[] = {
-    r3000_i_mfc0   , r3000_i_invalid, r3000_i_invalid, r3000_i_invalid,
-    r3000_i_mtc0   , r3000_i_invalid, r3000_i_invalid, r3000_i_invalid,
-    r3000_i_invalid, r3000_i_invalid, r3000_i_invalid, r3000_i_invalid,
+    r3000_i_mfc0   , r3000_i_tlbr   , r3000_i_tlbwi  , r3000_i_invalid,
+    r3000_i_mtc0   , r3000_i_invalid, r3000_i_tlbwr  , r3000_i_invalid,
+    r3000_i_tlbp   , r3000_i_invalid, r3000_i_invalid, r3000_i_invalid,
     r3000_i_invalid, r3000_i_invalid, r3000_i_invalid, r3000_i_invalid,
     r3000_i_rfe    , r3000_i_invalid, r3000_i_invalid, r3000_i_invalid,
     r3000_i_invalid, r3000_i_invalid, r3000_i_invalid, r3000_i_invalid,
@@ -169,6 +169,54 @@ r3000_t* r3000_create() {
 
 void r3000_destroy(r3000_t* cpu) {
     free(cpu);
+}
+
+uint32_t mmu_tlb_lookup(r3000_t* cpu, uint32_t key) {
+    uint32_t kvpn = key & TLBE_VPN;
+    uint32_t kasid = key & TLBE_ASID;
+
+    for (int i = 0; i < 64; i++) {
+        uint32_t entry = cpu->tlb[i].hi;
+
+        int global = (cpu->tlb[i].lo & TLBE_G) != 0;
+        uint32_t evpn = entry & TLBE_VPN;
+        uint32_t easid = entry & TLBE_ASID;
+
+        if ((evpn == kvpn) && (global || (easid == kasid)))
+            return i;
+    }
+
+    return MMU_ENOENT;
+}
+
+// To-do: Setup Context register
+
+uint32_t mmu_map_address(r3000_t* cpu, uint32_t virt, int write) {
+    uint32_t offset = virt & 0xfff;
+    uint32_t entry = (virt & 0xfffff000) | (cpu->cop0_r[COP0_ENTRYHI] & TLBE_ASID);
+
+    uint32_t index = mmu_tlb_lookup(cpu, entry);
+
+    if (index == MMU_ENOENT) {
+        cpu->cop0_r[COP0_BADVADDR] = cpu->pc;
+
+        r3000_exception(cpu, write ? CAUSE_TLBS : CAUSE_TLBL);
+
+        return 0xffffffff;
+    }
+
+    uint32_t match = cpu->tlb[index].lo;
+
+    if (write && !(match & TLBE_D)) {
+        cpu->cop0_r[COP0_BADVADDR] = cpu->pc;
+        // cpu->cop0_r[COP0_CONTEXT] = cpu->pc & 0xfffff000;
+
+        r3000_exception(cpu, CAUSE_MOD);
+
+        return 0xffffffff;
+    }
+
+    return (match & 0xfffff000) | offset;
 }
 
 uint32_t r3000_read32(r3000_t* cpu, uint32_t addr) {
@@ -1160,6 +1208,53 @@ void r3000_i_rfe(r3000_t* cpu) {
 
     cpu->cop0_r[COP0_SR] &= 0xfffffff0;
     cpu->cop0_r[COP0_SR] |= mode >> 2;
+}
+
+void r3000_i_tlbp(r3000_t* cpu) {
+    TRACE_N("tlbp");
+
+    DO_PENDING_LOAD;
+
+    uint32_t index = mmu_tlb_lookup(cpu, cpu->cop0_r[COP0_ENTRYHI]);
+
+    if (index == MMU_ENOENT) {
+        cpu->cop0_r[COP0_INDEX] |= 0x80000000;
+    } else {
+        cpu->cop0_r[COP0_INDEX] = index << 8;
+    }
+}
+
+void r3000_i_tlbr(r3000_t* cpu) {
+    TRACE_N("tlbr");
+
+    DO_PENDING_LOAD;
+
+    uint32_t index = cpu->cop0_r[COP0_INDEX] & 0x3f;
+
+    cpu->cop0_r[COP0_ENTRYLO] = cpu->tlb[index].lo;
+    cpu->cop0_r[COP0_ENTRYHI] = cpu->tlb[index].hi;
+}
+
+void r3000_i_tlbwi(r3000_t* cpu) {
+    TRACE_N("tlbwi");
+
+    DO_PENDING_LOAD;
+
+    uint32_t index = (cpu->cop0_r[COP0_INDEX] >> 8) & 0x3f;
+
+    cpu->tlb[index].lo = cpu->cop0_r[COP0_ENTRYLO];
+    cpu->tlb[index].hi = cpu->cop0_r[COP0_ENTRYHI];
+}
+
+void r3000_i_tlbwr(r3000_t* cpu) {
+    TRACE_N("tlbwr");
+
+    DO_PENDING_LOAD;
+
+    uint32_t index = (cpu->cop0_r[COP0_RANDOM] >> 8) & 0x3f;
+
+    cpu->tlb[index].lo = cpu->cop0_r[COP0_ENTRYLO];
+    cpu->tlb[index].hi = cpu->cop0_r[COP0_ENTRYHI];
 }
 
 // To-do: COP1 (FPU)
