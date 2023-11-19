@@ -1,11 +1,12 @@
 #include <stdint.h>
 
 #include "cpu.h"
+#include "elf.h"
 
 uint8_t program[] = {
     0xad, 0xde, 0x02, 0x3c, 0xef, 0xbe, 0x42, 0x34,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0xff, 0xff, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x00, 0x10,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -28,7 +29,7 @@ uint32_t bus_read(uint32_t addr, void* udata) {
     return 0x00000000;
 }
 
-int main() {
+int main(int argc, const char* argv[]) {
     r3000_bus_t bus = {
         .query_access_cycles = bus_query,
         .read32 = bus_read,
@@ -41,6 +42,26 @@ int main() {
 
     r3000_t* cpu = r3000_create();
     r3000_init(cpu, &bus);
+
+    elf_file_t* elf = elf_create();
+
+    if (elf_load(elf, argv[1]))
+        return 1;
+
+    for (int i = 0; i < elf->ehdr->e_phnum; i++) {
+        printf("phdr[%i] p_type=%08x p_offset=%08x p_vaddr=%08x p_paddr=%08x p_filesz=%08x p_memsz=%08x p_flags=%08x p_align=%08x\n",
+            i,
+            elf->phdr[i]->p_type,
+            elf->phdr[i]->p_offset,
+            elf->phdr[i]->p_vaddr,
+            elf->phdr[i]->p_paddr,
+            elf->phdr[i]->p_filesz,
+            elf->phdr[i]->p_memsz,
+            elf->phdr[i]->p_flags,
+            elf->phdr[i]->p_align
+        );
+    }
+
     r3000_cycle(cpu);
     r3000_cycle(cpu);
     r3000_cycle(cpu);
@@ -61,6 +82,7 @@ int main() {
     printf("pc=%08x hi=%08x lo=%08x\n", cpu->pc, cpu->hi, cpu->lo);
 
     r3000_destroy(cpu);
+    elf_destroy(elf);
 
     return 0;
 }
