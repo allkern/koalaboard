@@ -10,8 +10,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#define r3000_CPS 33868800 // 33868800 Clocks/s
-#define r3000_FREQ 33.868800f // 33.868800 MHz
+#define R3000_CPS 33868800 // 33868800 Clocks/s
+#define R3000_FREQ 33.868800f // 33.868800 MHz
 
 struct r3000_t;
 
@@ -234,14 +234,15 @@ int r3000_check_irq(r3000_t*);
 #define CAUSE_CPU       (0x0b << 2)
 #define CAUSE_OV        (0x0c << 2)
 
-#define TLBE_VPN   0xfffff000
-#define TLBE_ASID  0x00000fc0
-#define TLBE_PFN   0xfffff000
-#define TLBE_N     0x00000800
-#define TLBE_D     0x00000400
-#define TLBE_V     0x00000200
-#define TLBE_G     0x00000100
-#define MMU_ENOENT 0xffffffff
+#define TLBE_VPN    0xfffff000
+#define TLBE_ASID   0x00000fc0
+#define TLBE_PFN    0xfffff000
+#define TLBE_N      0x00000800
+#define TLBE_D      0x00000400
+#define TLBE_V      0x00000200
+#define TLBE_G      0x00000100
+#define MMU_ENOENT  0xffffffff
+#define MMU_SIGSEGV 0xffffffff
 
 void r3000_i_invalid(r3000_t*);
 

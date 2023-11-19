@@ -1,4 +1,5 @@
 #include "cpu.h"
+#include "log.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -114,7 +115,16 @@ static const uint32_t g_r3000_cop0_write_mask_table[] = {
     cpu->load_v = 0xffffffff; \
     cpu->load_d = 0;
 
+#define CPU_TRACE
+
 #ifdef CPU_TRACE
+static const char* g_mips_cc_register_names[] = {
+    "r0", "at", "v0", "v1", "a0", "a1", "a2", "a3",
+    "t0", "t1", "t2", "t3", "t4", "t5", "t6", "t7",
+    "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7",
+    "t8", "t9", "k0", "k1", "gp", "sp", "fp", "ra"
+};
+
 #define DEBUG_ALL \
     log_fatal("r0=%08x at=%08x v0=%08x v1=%08x", cpu->r[0] , cpu->r[1] , cpu->r[2] , cpu->r[3] ); \
     log_fatal("a0=%08x a1=%08x a2=%08x a3=%08x", cpu->r[4] , cpu->r[5] , cpu->r[6] , cpu->r[7] ); \
@@ -146,12 +156,70 @@ const char* g_mips_cop0_register_names[] = {
     "cop0_prid"
 };
 
-static const char* g_mips_cc_register_names[] = {
-    "r0", "at", "v0", "v1", "a0", "a1", "a2", "a3",
-    "t0", "t1", "t2", "t3", "t4", "t5", "t6", "t7",
-    "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7",
-    "t8", "t9", "k0", "k1", "gp", "sp", "fp", "ra"
-};
+#define TRACE_M(m) \
+    printf("%08x: %-7s $%s, %+i($%s)\n", cpu->pc-4, m, g_mips_cc_register_names[T], IMM16S, g_mips_cc_register_names[S])
+
+#define TRACE_I16S(m) \
+    printf("%08x: %-7s $%s, 0x%04x\n", cpu->pc-4, m, g_mips_cc_register_names[T], IMM16)
+
+#define TRACE_I16D(m) \
+    printf("%08x: %-7s $%s, $%s, 0x%04x\n", cpu->pc-4, m, g_mips_cc_register_names[T], g_mips_cc_register_names[S], IMM16)
+
+#define TRACE_I5D(m) \
+    printf("%08x: %-7s $%s, $%s, %u\n", cpu->pc-4, m, g_mips_cc_register_names[D], g_mips_cc_register_names[T], IMM5)
+
+#define TRACE_I26(m) \
+    printf("%08x: %-7s 0x%07x\n", cpu->pc-4, m, ((cpu->pc & 0xf0000000) | (IMM26 << 2)))
+
+#define TRACE_RT(m) \
+    printf("%08x: %-7s $%s, $%s, $%s\n", cpu->pc-4, m, g_mips_cc_register_names[D], g_mips_cc_register_names[S], g_mips_cc_register_names[T])
+
+#define TRACE_C0M(m) \
+    printf("%08x: %-7s $%s, $%s\n", cpu->pc-4, m, g_mips_cc_register_names[T], g_mips_cop0_register_names[D])
+
+#define TRACE_C2M(m) \
+    printf("%08x: %-7s $%s, $cop2_r%u\n", cpu->pc-4, m, g_mips_cc_register_names[T], D)
+
+#define TRACE_C2MC(m) \
+    printf("%08x: %-7s $%s, $cop2_r%u\n", cpu->pc-4, m, g_mips_cc_register_names[T], D + 32)
+
+#define TRACE_B(m) \
+    printf("%08x: %-7s $%s, $%s, %-i\n", cpu->pc-4, m, g_mips_cc_register_names[S], g_mips_cc_register_names[T], IMM16S << 2)
+
+#define TRACE_RS(m) \
+    printf("%08x: %-7s $%s\n", cpu->pc-4, m, g_mips_cc_register_names[S])
+
+#define TRACE_MTF(m) \
+    printf("%08x: %-7s $%s\n", cpu->pc-4, m, g_mips_cc_register_names[D])
+
+#define TRACE_RD(m) \
+    printf("%08x: %-7s $%s, $%s\n", cpu->pc-4, m, g_mips_cc_register_names[D], g_mips_cc_register_names[S])
+
+#define TRACE_MD(m) \
+    printf("%08x: %-7s $%s, $%s\n", cpu->pc-4, m, g_mips_cc_register_names[S], g_mips_cc_register_names[T]);
+
+#define TRACE_I20(m) \
+    printf("%08x: %-7s 0x%05x\n", cpu->pc-4, m, CMT);
+
+#define TRACE_N(m) \
+    printf("%08x: %-7s\n", cpu->pc-4, m);
+#else
+#define TRACE_M(m)
+#define TRACE_I16S(m)
+#define TRACE_I16D(m)
+#define TRACE_I5D(m)
+#define TRACE_I26(m)
+#define TRACE_RT(m)
+#define TRACE_C0M(m)
+#define TRACE_C2M(m)
+#define TRACE_C2MC(m)
+#define TRACE_B(m)
+#define TRACE_RS(m)
+#define TRACE_MTF(m)
+#define TRACE_RD(m)
+#define TRACE_MD(m)
+#define TRACE_I20(m)
+#define TRACE_N(m)
 #endif
 
 #define SE8(v) ((int32_t)((int8_t)v))
@@ -191,7 +259,14 @@ uint32_t mmu_tlb_lookup(r3000_t* cpu, uint32_t key) {
 
 // To-do: Setup Context register
 
-uint32_t mmu_map_address(r3000_t* cpu, uint32_t virt, int write) {
+uint32_t mmu_map_address(r3000_t* cpu, uint32_t virt, uint32_t* phys, int write) {
+    // KSEG0 and KSEG1 addresses are unmapped
+    if ((virt & 0x80000000) && !(virt & 0x40000000)) {
+        *phys = virt;
+
+        return 0;
+    }
+
     uint32_t offset = virt & 0xfff;
     uint32_t entry = (virt & 0xfffff000) | (cpu->cop0_r[COP0_ENTRYHI] & TLBE_ASID);
 
@@ -202,31 +277,37 @@ uint32_t mmu_map_address(r3000_t* cpu, uint32_t virt, int write) {
 
         r3000_exception(cpu, write ? CAUSE_TLBS : CAUSE_TLBL);
 
-        return 0xffffffff;
+        return MMU_ENOENT;
     }
 
     uint32_t match = cpu->tlb[index].lo;
 
     if (write && !(match & TLBE_D)) {
         cpu->cop0_r[COP0_BADVADDR] = cpu->pc;
-        // cpu->cop0_r[COP0_CONTEXT] = cpu->pc & 0xfffff000;
 
         r3000_exception(cpu, CAUSE_MOD);
 
-        return 0xffffffff;
+        return MMU_SIGSEGV;
     }
 
-    return (match & 0xfffff000) | offset;
+    *phys = (match & 0xfffff000) | offset;
+
+    return 0;
 }
 
 uint32_t r3000_read32(r3000_t* cpu, uint32_t addr) {
+    uint32_t phys;
+
+    if (mmu_map_address(cpu, addr, &phys, 0))
+        return 0xffffffff;
+
     if (addr & 3) {
         r3000_exception(cpu, CAUSE_ADEL);
 
         return 0xffffffff;
     }
 
-    uint32_t data = cpu->bus_read32(addr, cpu->bus_udata);
+    uint32_t data = cpu->bus_read32(phys, cpu->bus_udata);
 
     cpu->last_cycles += cpu->bus_query_access_cycles(cpu->bus_udata);
 
@@ -234,13 +315,18 @@ uint32_t r3000_read32(r3000_t* cpu, uint32_t addr) {
 }
 
 uint32_t r3000_read16(r3000_t* cpu, uint32_t addr) {
+    uint32_t phys;
+
+    if (mmu_map_address(cpu, addr, &phys, 0))
+        return 0xffffffff;
+
     if (addr & 1) {
         r3000_exception(cpu, CAUSE_ADEL);
 
         return 0xffffffff;
     }
 
-    uint32_t data = cpu->bus_read16(addr, cpu->bus_udata);
+    uint32_t data = cpu->bus_read16(phys, cpu->bus_udata);
 
     cpu->last_cycles += cpu->bus_query_access_cycles(cpu->bus_udata);
 
@@ -248,7 +334,12 @@ uint32_t r3000_read16(r3000_t* cpu, uint32_t addr) {
 }
 
 uint32_t r3000_read8(r3000_t* cpu, uint32_t addr) {
-    uint32_t data = cpu->bus_read8(addr, cpu->bus_udata);
+    uint32_t phys;
+
+    if (mmu_map_address(cpu, addr, &phys, 0))
+        return 0xffffffff;
+
+    uint32_t data = cpu->bus_read8(phys, cpu->bus_udata);
 
     cpu->last_cycles += cpu->bus_query_access_cycles(cpu->bus_udata);
 
@@ -256,31 +347,46 @@ uint32_t r3000_read8(r3000_t* cpu, uint32_t addr) {
 }
 
 void r3000_write32(r3000_t* cpu, uint32_t addr, uint32_t data) {
+    uint32_t phys;
+
+    if (mmu_map_address(cpu, addr, &phys, 1))
+        return;
+
     if (addr & 3) {
         r3000_exception(cpu, CAUSE_ADES);
 
         return;
     }
 
-    cpu->bus_write32(addr, data, cpu->bus_udata);
+    cpu->bus_write32(phys, data, cpu->bus_udata);
 
     cpu->last_cycles += cpu->bus_query_access_cycles(cpu->bus_udata);
 }
 
 void r3000_write16(r3000_t* cpu, uint32_t addr, uint32_t data) {
+    uint32_t phys;
+
+    if (mmu_map_address(cpu, addr, &phys, 1))
+        return;
+
     if (addr & 1) {
         r3000_exception(cpu, CAUSE_ADES);
 
         return;
     }
 
-    cpu->bus_write16(addr, data, cpu->bus_udata);
+    cpu->bus_write16(phys, data, cpu->bus_udata);
 
     cpu->last_cycles += cpu->bus_query_access_cycles(cpu->bus_udata);
 }
 
 void r3000_write8(r3000_t* cpu, uint32_t addr, uint32_t data) {
-    cpu->bus_write8(addr, data, cpu->bus_udata);
+    uint32_t phys;
+
+    if (mmu_map_address(cpu, addr, &phys, 1))
+        return;
+
+    cpu->bus_write8(phys, data, cpu->bus_udata);
 
     cpu->last_cycles += cpu->bus_query_access_cycles(cpu->bus_udata);
 }
@@ -294,6 +400,7 @@ void r3000_init(r3000_t* cpu, r3000_bus_t* bus) {
     cpu->bus_write32 = bus->write32;
     cpu->bus_write16 = bus->write16;
     cpu->bus_write8 = bus->write8;
+    cpu->bus_query_access_cycles = bus->query_access_cycles;
 
     cpu->pc = 0xbfc00000;
     cpu->next_pc = cpu->pc + 4;
@@ -310,9 +417,8 @@ void r3000_cycle(r3000_t* cpu) {
     cpu->branch = 0;
     cpu->branch_taken = 0;
 
-    if (cpu->saved_pc & 3) {
+    if (cpu->saved_pc & 3)
         r3000_exception(cpu, CAUSE_ADEL);
-    }
 
     cpu->opcode = r3000_read32(cpu, cpu->pc);
 
@@ -836,6 +942,10 @@ void r3000_i_lwc1(r3000_t* cpu) {
     r3000_exception(cpu, CAUSE_CPU);
 }
 
+void r3000_i_lwc2(r3000_t* cpu) {
+    r3000_exception(cpu, CAUSE_CPU);
+}
+
 void r3000_i_lwc3(r3000_t* cpu) {
     r3000_exception(cpu, CAUSE_CPU);
 }
@@ -845,6 +955,10 @@ void r3000_i_swc0(r3000_t* cpu) {
 }
 
 void r3000_i_swc1(r3000_t* cpu) {
+    r3000_exception(cpu, CAUSE_CPU);
+}
+
+void r3000_i_swc2(r3000_t* cpu) {
     r3000_exception(cpu, CAUSE_CPU);
 }
 
@@ -1258,6 +1372,11 @@ void r3000_i_tlbwr(r3000_t* cpu) {
 }
 
 // To-do: COP1 (FPU)
+void r3000_i_mfc1(r3000_t* cpu) {}
+void r3000_i_cfc1(r3000_t* cpu) {}
+void r3000_i_mtc1(r3000_t* cpu) {}
+void r3000_i_ctc1(r3000_t* cpu) {}
+void r3000_i_fpu(r3000_t* cpu) {}
 
 #undef R_R0
 #undef R_A0
