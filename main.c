@@ -1,35 +1,109 @@
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "cpu.h"
 #include "elf.h"
 
-uint8_t program[] = {
-    0xad, 0xde, 0x02, 0x3c, 0xef, 0xbe, 0x42, 0x34,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x00, 0x10,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-};
+char* get_pt_name(uint32_t pt) {
+    char* buf = malloc(14);
+
+    memset(buf, ' ', 14);
+    
+    if (pt == PT_NULL) {
+        strcpy(buf, "NULL");
+        buf[strlen("NULL")] = ' ';
+    } else if (pt == PT_LOAD) {
+        strcpy(buf, "LOAD");
+        buf[strlen("LOAD")] = ' ';
+    } else if (pt == PT_DYNAMIC) {
+        strcpy(buf, "DYNAMIC");
+        buf[strlen("DYNAMIC")] = ' ';
+    } else if (pt == PT_INTERP) {
+        strcpy(buf, "INTERP");
+        buf[strlen("INTERP")] = ' ';
+    } else if (pt == PT_NOTE) {
+        strcpy(buf, "NOTE");
+        buf[strlen("NOTE")] = ' ';
+    } else if (pt == PT_SHLIB) {
+        strcpy(buf, "SHLIB");
+        buf[strlen("SHLIB")] = ' ';
+    } else if (pt == PT_PHDR) {
+        strcpy(buf, "PHDR");
+        buf[strlen("PHDR")] = ' ';
+    } else if (pt == PT_TLS) {
+        strcpy(buf, "TLS");
+        buf[strlen("TLS")] = ' ';
+    } else if (pt == PT_NUM) {
+        strcpy(buf, "NUM");
+        buf[strlen("NUM")] = ' ';
+    } else if (pt == PT_LOOS) {
+        strcpy(buf, "LOOS");
+        buf[strlen("LOOS")] = ' ';
+    } else if (pt == PT_GNU_EH_FRAME) {
+        strcpy(buf, "GNU_EH_FRAME");
+        buf[strlen("GNU_EH_FRAME")] = ' ';
+    } else if (pt == PT_GNU_STACK) {
+        strcpy(buf, "GNU_STACK");
+        buf[strlen("GNU_STACK")] = ' ';
+    } else if (pt == PT_GNU_RELRO) {
+        strcpy(buf, "GNU_RELRO");
+        buf[strlen("GNU_RELRO")] = ' ';
+    } else if (pt == PT_LOSUNW) {
+        strcpy(buf, "LOSUNW");
+        buf[strlen("LOSUNW")] = ' ';
+    } else if (pt == PT_SUNWBSS) {
+        strcpy(buf, "SUNWBSS");
+        buf[strlen("SUNWBSS")] = ' ';
+    } else if (pt == PT_SUNWSTACK) {
+        strcpy(buf, "SUNWSTACK");
+        buf[strlen("SUNWSTACK")] = ' ';
+    } else if (pt == PT_HISUNW) {
+        strcpy(buf, "HISUNW");
+        buf[strlen("HISUNW")] = ' ';
+    } else if (pt == PT_HIOS) {
+        strcpy(buf, "HIOS");
+        buf[strlen("HIOS")] = ' ';
+    } else if (pt == PT_LOPROC) {
+        strcpy(buf, "LOPROC");
+        buf[strlen("LOPROC")] = ' ';
+    } else if (pt == PT_HIPROC) {
+        strcpy(buf, "HIPROC");
+        buf[strlen("HIPROC")] = ' ';
+    } else {
+        strcpy(buf, "<unknown>");
+        buf[strlen("<unknown>")] = ' ';
+    }
+
+    return buf;
+}
 
 int bus_query(void* udata) {
     return 0;
 }
 
+uint8_t* ram;
+
 void bus_write(uint32_t addr, uint32_t data, void* udata) {
+    if ((addr >= 0x80000000) && (addr < 0x81000000)) {
+        ram[addr - 0x80000000] = data;
+    }
+
     return;
 }
 
 uint32_t bus_read(uint32_t addr, void* udata) {
-    if (addr >= 0xbfc00000)
-        return *(uint32_t*)(&program[addr - 0xbfc00000]);
+    if ((addr >= 0x80000000) && (addr < 0x81000000)) {
+        return *(uint32_t*)(&ram[addr - 0x80000000]);
+    }
 
-    return 0x00000000;
+    return 0xffffffff;
 }
 
 int main(int argc, const char* argv[]) {
+    // Allocate 16 MiB of memory
+    ram = malloc(0x1000000);
+
     r3000_bus_t bus = {
         .query_access_cycles = bus_query,
         .read32 = bus_read,
@@ -48,19 +122,52 @@ int main(int argc, const char* argv[]) {
     if (elf_load(elf, argv[1]))
         return 1;
 
+    puts("Program Headers:");
+    puts("  Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align");
+
     for (int i = 0; i < elf->ehdr->e_phnum; i++) {
-        printf("phdr[%i] p_type=%08x p_offset=%08x p_vaddr=%08x p_paddr=%08x p_filesz=%08x p_memsz=%08x p_flags=%08x p_align=%08x\n",
-            i,
-            elf->phdr[i]->p_type,
-            elf->phdr[i]->p_offset,
-            elf->phdr[i]->p_vaddr,
-            elf->phdr[i]->p_paddr,
-            elf->phdr[i]->p_filesz,
-            elf->phdr[i]->p_memsz,
-            elf->phdr[i]->p_flags,
-            elf->phdr[i]->p_align
+        Elf32_Phdr* phdr = elf->phdr[i];
+
+        char* pt_name = get_pt_name(phdr->p_type);
+
+        printf("  %s 0x%06x 0x%08x 0x%08x 0x%05x 0x%05x %c%c%c 0x%x\n",
+            pt_name,
+            phdr->p_offset,
+            phdr->p_vaddr,
+            phdr->p_paddr,
+            phdr->p_filesz,
+            phdr->p_memsz,
+            phdr->p_flags & PF_R ? 'R' : ' ',
+            phdr->p_flags & PF_W ? 'W' : ' ',
+            phdr->p_flags & PF_X ? 'X' : ' ',
+            phdr->p_align
         );
+
+        free(pt_name);
+
+        int seg = 0;
+
+        uint32_t phys = 0x80000000;
+        uint32_t ram_off = 0x00000000;
+
+        if (elf->phdr[i]->p_type == PT_LOAD) {
+            cpu->tlb[seg].hi = phdr->p_vaddr & 0xfffff000;
+            cpu->tlb[seg].lo = (phys & 0xfffff000) | TLBE_G | TLBE_V | TLBE_D;
+
+            elf_load_segment(elf, i, &ram[ram_off]);
+
+            phys += phdr->p_memsz;
+            ram_off += phdr->p_filesz;
+
+            ++seg;
+        }
     }
+
+    printf("Setting PC to entry address %08x\n", elf->ehdr->e_entry);
+
+    r3000_set_pc(cpu, elf->ehdr->e_entry);
+
+    cpu->r[29] = 0x81000000;
 
     r3000_cycle(cpu);
     r3000_cycle(cpu);

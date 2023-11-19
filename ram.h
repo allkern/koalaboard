@@ -15,7 +15,7 @@ typedef struct {
 } psx_ram_t;
 
 psx_ram_t* psx_ram_create();
-void psx_ram_init(psx_ram_t*, psx_mc2_t*);
+void psx_ram_init(psx_ram_t*);
 uint32_t psx_ram_read32(psx_ram_t*, uint32_t);
 uint16_t psx_ram_read16(psx_ram_t*, uint32_t);
 uint8_t psx_ram_read8(psx_ram_t*, uint32_t);

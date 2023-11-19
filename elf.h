@@ -2,6 +2,7 @@
 #define ELF_H
 
 #include <stdint.h>
+#include <stdio.h>
 
 typedef uint32_t Elf32_Addr;
 typedef uint32_t Elf32_Off;
@@ -319,6 +320,35 @@ typedef uint64_t Elf32_Xword;
 #define SHF_ORDERED             (1 << 30)
 #define SHF_EXCLUDE             (1U << 31)
 
+#define PN_XNUM                 0xffff
+
+#define PT_NULL                 0
+#define PT_LOAD                 1
+#define PT_DYNAMIC              2
+#define PT_INTERP               3
+#define PT_NOTE                 4
+#define PT_SHLIB                5
+#define PT_PHDR                 6
+#define PT_TLS                  7
+#define PT_NUM                  8
+#define PT_LOOS                 0x60000000
+#define PT_GNU_EH_FRAME         0x6474e550
+#define PT_GNU_STACK            0x6474e551
+#define PT_GNU_RELRO            0x6474e552
+#define PT_LOSUNW               0x6ffffffa
+#define PT_SUNWBSS              0x6ffffffa
+#define PT_SUNWSTACK            0x6ffffffb
+#define PT_HISUNW               0x6fffffff
+#define PT_HIOS                 0x6fffffff
+#define PT_LOPROC               0x70000000
+#define PT_HIPROC               0x7fffffff
+
+#define PF_X                    (1 << 0)
+#define PF_W                    (1 << 1)
+#define PF_R                    (1 << 2)
+#define PF_MASKOS               0x0ff00000
+#define PF_MASKPROC             0xf0000000
+
 typedef struct {
     unsigned char e_ident[EI_NIDENT];
     uint16_t      e_type;
@@ -361,6 +391,7 @@ typedef struct {
 } Elf32_Shdr;
 
 typedef struct {
+    FILE* file;
     Elf32_Ehdr* ehdr;
     Elf32_Phdr** phdr;
     Elf32_Shdr** shdr;
@@ -368,6 +399,7 @@ typedef struct {
 
 elf_file_t* elf_create();
 int elf_load(elf_file_t* elf, const char* path);
+void elf_load_segment(elf_file_t* elf, int i, void* buf);
 void elf_destroy(elf_file_t* elf); 
 
 #endif

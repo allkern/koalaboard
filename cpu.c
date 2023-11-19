@@ -258,11 +258,32 @@ uint32_t mmu_tlb_lookup(r3000_t* cpu, uint32_t key) {
 }
 
 // To-do: Setup Context register
+#define R3000_KUSEG 0
+#define R3000_KSEG0 1
+#define R3000_KSEG1 2
+#define R3000_KSEG2 3
+
+int mmu_get_segment(uint32_t virt) {
+    if (virt <= 0x7fffffff) {
+        return R3000_KUSEG;
+    } else if ((virt >= 0x80000000) && (virt <= 0x9fffffff)) {
+        return R3000_KSEG0;
+    } else if ((virt >= 0xa0000000) && (virt <= 0xbfffffff)) {
+        return R3000_KSEG1;
+    }
+
+    return R3000_KSEG2;
+}
 
 uint32_t mmu_map_address(r3000_t* cpu, uint32_t virt, uint32_t* phys, int write) {
-    // KSEG0 and KSEG1 addresses are unmapped
-    if ((virt & 0x80000000) && !(virt & 0x40000000)) {
-        *phys = virt;
+    int seg = mmu_get_segment(virt);
+
+    if (seg == R3000_KSEG0) {
+        *phys = virt & 0x7fffffff;
+
+        return 0;
+    } else if (seg == R3000_KSEG1) {
+        *phys = virt & 0x1fffffff;
 
         return 0;
     }
@@ -441,6 +462,11 @@ void r3000_cycle(r3000_t* cpu) {
 
 int r3000_check_irq(r3000_t* cpu) {
     return (cpu->cop0_r[COP0_SR] & SR_IEC) && (cpu->cop0_r[COP0_SR] & cpu->cop0_r[COP0_CAUSE] & 0x00000700);
+}
+
+void r3000_set_pc(r3000_t* cpu, uint32_t addr) {
+    cpu->pc = addr;
+    cpu->next_pc = cpu->pc + 4;
 }
 
 void r3000_exception(r3000_t* cpu, uint32_t cause) {

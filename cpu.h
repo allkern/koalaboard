@@ -200,6 +200,7 @@ void r3000_write32(r3000_t*, uint32_t, uint32_t);
 void r3000_write16(r3000_t*, uint32_t, uint32_t);
 void r3000_write8(r3000_t*, uint32_t, uint32_t);
 int r3000_check_irq(r3000_t*);
+void r3000_set_pc(r3000_t*, uint32_t);
 
 /*
     00h INT     Interrupt
