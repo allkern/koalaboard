@@ -89,6 +89,7 @@ typedef struct {
     r3000_bus_write16_t write16;
     r3000_bus_write8_t write8;
     r3000_bus_query_access_cycles_t query_access_cycles;
+    void* udata;
 } r3000_bus_t;
 
 struct __attribute__((__packed__)) r3000_t {
@@ -108,13 +109,12 @@ struct __attribute__((__packed__)) r3000_t {
     r3000_bus_write16_t bus_write16;
     r3000_bus_write8_t bus_write8;
     r3000_bus_query_access_cycles_t bus_query_access_cycles;
+    void* bus_udata;
 
     struct {
         uint32_t lo;
         uint32_t hi;
     } tlb[64];
-
-    void* bus_udata;
 
     uint32_t cop0_r[16];
 };

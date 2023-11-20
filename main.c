@@ -4,6 +4,9 @@
 
 #include "cpu.h"
 #include "elf.h"
+#include "bus.h"
+#include "ram.h"
+#include "vmc.h"
 
 char* get_pt_name(uint32_t pt) {
     char* buf = malloc(14);
@@ -78,44 +81,48 @@ char* get_pt_name(uint32_t pt) {
     return buf;
 }
 
-int bus_query(void* udata) {
-    return 0;
-}
-
-uint8_t* ram;
-
-void bus_write(uint32_t addr, uint32_t data, void* udata) {
-    if ((addr >= 0x80000000) && (addr < 0x81000000)) {
-        ram[addr - 0x80000000] = data;
-    }
-
-    return;
-}
-
-uint32_t bus_read(uint32_t addr, void* udata) {
-    if ((addr >= 0x80000000) && (addr < 0x81000000)) {
-        return *(uint32_t*)(&ram[addr - 0x80000000]);
-    }
-
-    return 0xffffffff;
-}
+#define RAM_PHYS_BASE 0x80000000
+#define RAM_SIZE      0x1000000
+#define VMC_PHYS_BASE 0x1f800000
+#define VMC_SIZE      0x100
 
 int main(int argc, const char* argv[]) {
-    // Allocate 16 MiB of memory
-    ram = malloc(0x1000000);
+    bus_t* bus = bus_create();
+    bus_init(bus);
 
-    r3000_bus_t bus = {
-        .query_access_cycles = bus_query,
-        .read32 = bus_read,
-        .read16 = bus_read,
-        .read8 = bus_read,
-        .write32 = bus_write,
-        .write16 = bus_write,
-        .write8 = bus_write
+    bus_device_t* ram_bdev = bus_register_device(
+        bus,
+        RAM_PHYS_BASE,
+        RAM_PHYS_BASE + RAM_SIZE
+    );
+
+    ram_t* ram = ram_create();
+    ram_init(ram, 0x1000000);
+    ram_init_bus_device(ram, ram_bdev);
+
+    bus_device_t* vmc_bdev = bus_register_device(
+        bus,
+        VMC_PHYS_BASE,
+        VMC_PHYS_BASE + VMC_SIZE
+    );
+
+    vmc_t* vmc = vmc_create();
+    vmc_init(vmc);
+    vmc_init_bus_device(vmc, vmc_bdev);
+
+    r3000_bus_t cpu_bus = {
+        .query_access_cycles = bus_query_access_cycles,
+        .read32 = bus_read32,
+        .read16 = bus_read16,
+        .read8 = bus_read8,
+        .write32 = bus_write32,
+        .write16 = bus_write16,
+        .write8 = bus_write8,
+        .udata = bus
     };
 
     r3000_t* cpu = r3000_create();
-    r3000_init(cpu, &bus);
+    r3000_init(cpu, &cpu_bus);
 
     elf_file_t* elf = elf_create();
 
@@ -147,36 +154,39 @@ int main(int argc, const char* argv[]) {
 
         int seg = 0;
 
-        uint32_t phys = 0x80000000;
-        uint32_t ram_off = 0x00000000;
+        uint32_t offset = 0;
 
         if (elf->phdr[i]->p_type == PT_LOAD) {
             cpu->tlb[seg].hi = phdr->p_vaddr & 0xfffff000;
-            cpu->tlb[seg].lo = (phys & 0xfffff000) | TLBE_G | TLBE_V | TLBE_D;
+            cpu->tlb[seg].lo = ((offset + RAM_PHYS_BASE) & 0xfffff000) | TLBE_G | TLBE_V | TLBE_D;
 
-            elf_load_segment(elf, i, &ram[ram_off]);
+            elf_load_segment(elf, i, &ram->buf[offset]);
 
-            phys += phdr->p_memsz;
-            ram_off += phdr->p_filesz;
+            offset += phdr->p_memsz;
 
             ++seg;
         }
     }
 
+    // Allocate 4 KiB of stack space
+    printf("Allocating stack space...\n");
+
+    cpu->tlb[63].hi = 0x00fff000;
+    cpu->tlb[63].lo = 0x80fff000 | TLBE_G | TLBE_V | TLBE_D;
+    cpu->r[29] = 0x00fffffc;
+
     printf("Setting PC to entry address %08x\n", elf->ehdr->e_entry);
 
     r3000_set_pc(cpu, elf->ehdr->e_entry);
 
-    cpu->r[29] = 0x81000000;
+    while (!vmc->exit_requested) {
+        r3000_cycle(cpu);
 
-    r3000_cycle(cpu);
-    r3000_cycle(cpu);
-    r3000_cycle(cpu);
-    r3000_cycle(cpu);
-    r3000_cycle(cpu);
-    r3000_cycle(cpu);
-    r3000_cycle(cpu);
-    r3000_cycle(cpu);
+        if (cpu->opcode == 0xffffffff)
+            break;
+    }
+
+    printf("\nexit_code=%08x\n", vmc->exit_code);
 
     printf("r0=%08x at=%08x v0=%08x v1=%08x\n", cpu->r[0] , cpu->r[1] , cpu->r[2] , cpu->r[3] );
     printf("a0=%08x a1=%08x a2=%08x a3=%08x\n", cpu->r[4] , cpu->r[5] , cpu->r[6] , cpu->r[7] );

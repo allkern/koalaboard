@@ -115,7 +115,7 @@ static const uint32_t g_r3000_cop0_write_mask_table[] = {
     cpu->load_v = 0xffffffff; \
     cpu->load_d = 0;
 
-#define CPU_TRACE
+//#define CPU_TRACE
 
 #ifdef CPU_TRACE
 static const char* g_mips_cc_register_names[] = {
@@ -422,6 +422,7 @@ void r3000_init(r3000_t* cpu, r3000_bus_t* bus) {
     cpu->bus_write16 = bus->write16;
     cpu->bus_write8 = bus->write8;
     cpu->bus_query_access_cycles = bus->query_access_cycles;
+    cpu->bus_udata = bus->udata;
 
     cpu->pc = 0xbfc00000;
     cpu->next_pc = cpu->pc + 4;
