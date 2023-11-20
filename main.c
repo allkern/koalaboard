@@ -7,6 +7,7 @@
 #include "bus.h"
 #include "ram.h"
 #include "vmc.h"
+#include "uart.h"
 
 char* get_pt_name(uint32_t pt) {
     char* buf = malloc(14);
@@ -81,10 +82,16 @@ char* get_pt_name(uint32_t pt) {
     return buf;
 }
 
-#define RAM_PHYS_BASE 0x80000000
-#define RAM_SIZE      0x1000000
-#define VMC_PHYS_BASE 0x1f800000
-#define VMC_SIZE      0x100
+#define RAM_PHYS_BASE  0x80000000
+#define RAM_SIZE       0x1000000
+#define VMC_PHYS_BASE  0x1f800000
+#define VMC_SIZE       0x100
+#define UART_PHYS_BASE 0x1f900000
+#define UART_SIZE      0x8
+
+void uart_tx_event(uint8_t data) {
+    putchar((char)data);
+}
 
 int main(int argc, const char* argv[]) {
     bus_t* bus = bus_create();
@@ -109,6 +116,16 @@ int main(int argc, const char* argv[]) {
     vmc_t* vmc = vmc_create();
     vmc_init(vmc);
     vmc_init_bus_device(vmc, vmc_bdev);
+
+    bus_device_t* uart_bdev = bus_register_device(
+        bus,
+        UART_PHYS_BASE,
+        UART_PHYS_BASE + UART_SIZE
+    );
+
+    uart_t* uart = uart_create();
+    uart_init(uart, uart_tx_event);
+    uart_init_bus_device(uart, uart_bdev);
 
     r3000_bus_t cpu_bus = {
         .query_access_cycles = bus_query_access_cycles,

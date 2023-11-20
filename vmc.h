@@ -1,5 +1,5 @@
-#ifndef vmc_H
-#define vmc_H
+#ifndef VMC_H
+#define VMC_H
 
 #include <stdint.h>
 #include <stdlib.h>

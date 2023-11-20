@@ -48,7 +48,6 @@ void exit(int code) {
 
 int main() {
     puts("Hello, world!");
-    printint(0xbeef, 10, 0);
 }
 
 void __start() {
