@@ -180,12 +180,12 @@ int main(int argc, const char* argv[]) {
                 seg,
                 cpu->tlb[seg].hi,
                 cpu->tlb[seg].lo,
-                offset
+                offset + (phdr->p_vaddr & 0xfff)
             );
 
-            elf_load_segment(elf, i, &ram->buf[offset]);
+            elf_load_segment(elf, i, &ram->buf[offset + (phdr->p_vaddr & 0xfff)]);
 
-            offset += elf->phdr[i]->p_align; // phdr->p_memsz;
+            offset += elf->phdr[i]->p_align;
 
             ++seg;
         }
