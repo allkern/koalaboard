@@ -14,7 +14,9 @@ void uart_init() {
 }
 
 void uart_send_byte(int c) {
-    while (!(mmio_read_8(UART_LSR) & LSR_TX_EMPTY));
+    // while (!(mmio_read_8(UART_LSR) & LSR_TX_EMPTY)) {
+    //     mmio_write_32(0x9f800000, 1);
+    // }
 
     mmio_write_8(UART_THR, c);
 }

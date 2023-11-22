@@ -14,7 +14,8 @@ typedef struct {
 
 static console_t g_current_console;
 
-static void _putchar(int c);
-static int _getchar();
+void _init_console(putchar_t putchar, getchar_t getchar);
+void _putchar(int c);
+int _getchar();
 
 #endif

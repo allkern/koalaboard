@@ -149,6 +149,9 @@ int main(int argc, const char* argv[]) {
     puts("Program Headers:");
     puts("  Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align");
 
+    int seg = 0;
+    uint32_t offset = 0;
+
     for (int i = 0; i < elf->ehdr->e_phnum; i++) {
         Elf32_Phdr* phdr = elf->phdr[i];
 
@@ -169,17 +172,20 @@ int main(int argc, const char* argv[]) {
 
         free(pt_name);
 
-        int seg = 0;
-
-        uint32_t offset = 0;
-
         if (elf->phdr[i]->p_type == PT_LOAD) {
             cpu->tlb[seg].hi = phdr->p_vaddr & 0xfffff000;
             cpu->tlb[seg].lo = ((offset + RAM_PHYS_BASE) & 0xfffff000) | TLBE_G | TLBE_V | TLBE_D;
 
+            printf("Loading TLB index %u v 0x%08x -> p 0x%08x segment @ 0x%08x\n",
+                seg,
+                cpu->tlb[seg].hi,
+                cpu->tlb[seg].lo,
+                offset
+            );
+
             elf_load_segment(elf, i, &ram->buf[offset]);
 
-            offset += phdr->p_memsz;
+            offset += elf->phdr[i]->p_align; // phdr->p_memsz;
 
             ++seg;
         }
@@ -190,7 +196,8 @@ int main(int argc, const char* argv[]) {
 
     cpu->tlb[63].hi = 0x00fff000;
     cpu->tlb[63].lo = 0x80fff000 | TLBE_G | TLBE_V | TLBE_D;
-    cpu->r[29] = 0x00fffffc;
+    cpu->r[29] = 0x01000000;
+    cpu->r[30] = cpu->r[29];
 
     printf("Setting PC to entry address %08x\n", elf->ehdr->e_entry);
 
@@ -198,6 +205,18 @@ int main(int argc, const char* argv[]) {
 
     while (!vmc->exit_requested) {
         r3000_cycle(cpu);
+        // printf("r0=%08x at=%08x v0=%08x v1=%08x\n", cpu->r[0] , cpu->r[1] , cpu->r[2] , cpu->r[3] );
+        // printf("a0=%08x a1=%08x a2=%08x a3=%08x\n", cpu->r[4] , cpu->r[5] , cpu->r[6] , cpu->r[7] );
+        // printf("t0=%08x t1=%08x t2=%08x t3=%08x\n", cpu->r[8] , cpu->r[9] , cpu->r[10], cpu->r[11]);
+        // printf("t4=%08x t5=%08x t6=%08x t7=%08x\n", cpu->r[12], cpu->r[13], cpu->r[14], cpu->r[15]);
+        // printf("s0=%08x s1=%08x s2=%08x s3=%08x\n", cpu->r[16], cpu->r[17], cpu->r[18], cpu->r[19]);
+        // printf("s4=%08x s5=%08x s6=%08x s7=%08x\n", cpu->r[20], cpu->r[21], cpu->r[22], cpu->r[23]);
+        // printf("t8=%08x t9=%08x k0=%08x k1=%08x\n", cpu->r[24], cpu->r[25], cpu->r[26], cpu->r[27]);
+        // printf("gp=%08x sp=%08x fp=%08x ra=%08x\n", cpu->r[28], cpu->r[29], cpu->r[30], cpu->r[31]);
+        // printf("pc=%08x hi=%08x lo=%08x\n", cpu->pc, cpu->hi, cpu->lo);
+
+        // fflush(stdout);
+        // getchar();
 
         if (cpu->opcode == 0xffffffff)
             break;

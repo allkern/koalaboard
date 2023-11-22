@@ -60,11 +60,11 @@ uint32_t uart_read8(uint32_t addr, void* udata) {
     uart_t* uart = (uart_t*)udata;
 
     switch (addr) {
-        case UART_RHR: return handle_rhr_read(uart);
-        case UART_IER: return uart->ier;
-        case UART_IIR: return uart->iir;
-        case UART_LCR: return uart->lcr;
-        case UART_LSR: return uart->lsr;
+        case UART_RHR: printf("rhr read %02x\n", uart->rhr); return handle_rhr_read(uart);
+        case UART_IER: printf("ier read %02x\n", uart->ier); return uart->ier;
+        case UART_IIR: printf("iir read %02x\n", uart->iir); return uart->iir;
+        case UART_LCR: printf("lcr read %02x\n", uart->lcr); return uart->lcr;
+        case UART_LSR: printf("lsr read %02x\n", uart->lsr); return uart->lsr;
     }
 
     return 0;
