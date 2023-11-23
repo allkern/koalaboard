@@ -18,12 +18,8 @@ int ram_query_access_cycles(void* udata) {
     return 0;
 }
 
-#include <stdio.h>
-
 uint32_t ram_read32(uint32_t addr, void* udata) {
     ram_t* ram = (ram_t*)udata;
-
-    printf("RAM read32 [%08x] = %08x\n", addr, *(uint32_t*)(&ram->buf[addr]));
 
     return *(uint32_t*)(&ram->buf[addr]);
 }
@@ -42,8 +38,6 @@ uint32_t ram_read8(uint32_t addr, void* udata) {
 
 void ram_write32(uint32_t addr, uint32_t data, void* udata) {
     ram_t* ram = (ram_t*)udata;
-
-    printf("RAM write32 [%08x] = %08x\n", addr, data);
 
     *(uint32_t*)(&ram->buf[addr]) = data;
 }

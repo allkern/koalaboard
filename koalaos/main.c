@@ -9,16 +9,21 @@ void exit(int code) {
 }
 
 int main() {
-    _printf("Hello, world!\n");
-}
+    kprintf("fmt: %s %x %d %u %i %p %%\n",
+        "a string",
+        0xbaadf00d,
+        1234,
+        4321,
+        -1000,
+        main
+    );
 
-typedef int (*func_t)(int);
+    return 0xaa;
+}
 
 void __start() {
     uart_init();
     _init_console(uart_send_byte, uart_recv_byte);
 
-    _printf("Hello, world!\n");
-
-    exit(1);
+    exit(main());
 }
