@@ -7,7 +7,7 @@
 #define PSX_DMAR_SIZE  0x80
 #define PSX_DMAR_END   0x1f8010ff
 
-#include "../bus.h"
+#include "bus.h"
 #include "ic.h"
 
 typedef struct {
@@ -20,7 +20,7 @@ typedef struct {
     uint32_t bus_delay;
     uint32_t io_base, io_size;
 
-    psx_bus_t* bus;
+    bus_t* bus;
     psx_ic_t* ic;
 
     dma_channel_t mdec_in;
@@ -43,7 +43,7 @@ typedef struct {
 } psx_dma_t;
 
 psx_dma_t* psx_dma_create();
-void psx_dma_init(psx_dma_t*, psx_bus_t*, psx_ic_t*);
+void psx_dma_init(psx_dma_t*, bus_t*, psx_ic_t*);
 void psx_dma_do_mdec_in(psx_dma_t*);
 void psx_dma_do_mdec_out(psx_dma_t*);
 void psx_dma_do_gpu(psx_dma_t*);
@@ -60,6 +60,14 @@ void psx_dma_write16(psx_dma_t*, uint32_t, uint16_t);
 void psx_dma_write8(psx_dma_t*, uint32_t, uint8_t);
 void psx_dma_destroy(psx_dma_t*);
 void psx_dma_update(psx_dma_t*, int);
+
+// Bus adapter
+uint32_t bus_dma_read32(uint32_t, void*);
+uint32_t bus_dma_read16(uint32_t, void*);
+uint32_t bus_dma_read8(uint32_t, void*);
+void bus_dma_write32(uint32_t, uint32_t, void*);
+void bus_dma_write16(uint32_t, uint32_t, void*);
+void bus_dma_write8(uint32_t, uint32_t, void*);
 
 typedef void (*psx_dma_do_fn_t)(psx_dma_t*);
 

@@ -168,4 +168,13 @@ void psx_gpu_set_event_callback(psx_gpu_t*, int, psx_gpu_event_callback_t);
 void* psx_gpu_get_display_buffer(psx_gpu_t*);
 void psx_gpu_update(psx_gpu_t*, int);
 
+// Bus adapter
+uint32_t bus_gpu_read32(uint32_t, void*);
+uint32_t bus_gpu_read16(uint32_t, void*);
+uint32_t bus_gpu_read8(uint32_t, void*);
+void bus_gpu_write32(uint32_t, uint32_t, void*);
+void bus_gpu_write16(uint32_t, uint32_t, void*);
+void bus_gpu_write8(uint32_t, uint32_t, void*);
+
+
 #endif

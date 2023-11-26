@@ -4,7 +4,6 @@
 #include <math.h>
 
 #include "gpu.h"
-#include "../log.h"
 
 int g_psx_gpu_dither_kernel[] = {
     -4, +0, -3, +1,
@@ -107,17 +106,17 @@ uint32_t psx_gpu_read32(psx_gpu_t* gpu, uint32_t offset) {
         case 0x04: return gpu->gpustat | 0x1e000000;
     }
 
-    log_warn("Unhandled 32-bit GPU read at offset %08x", offset);
+     // log_warn("Unhandled 32-bit GPU read at offset %08x", offset);
 
     return 0x0;
 }
 
 uint16_t psx_gpu_read16(psx_gpu_t* gpu, uint32_t offset) {
-    log_fatal("Unhandled 16-bit GPU read at offset %08x", offset);
+     // log_fatal("Unhandled 16-bit GPU read at offset %08x", offset);
 }
 
 uint8_t psx_gpu_read8(psx_gpu_t* gpu, uint32_t offset) {
-    log_fatal("Unhandled 8-bit GPU read at offset %08x", offset);
+     // log_fatal("Unhandled 8-bit GPU read at offset %08x", offset);
 }
 
 int min(int x0, int x1) {
@@ -1458,12 +1457,10 @@ void gpu_cmd_02(psx_gpu_t* gpu) {
 
                 uint16_t color = BGR555(gpu->color);
 
-                for (uint32_t y = gpu->v0.y; y < (gpu->v0.y + gpu->ysiz); y++) {
-                    for (uint32_t x = gpu->v0.x; x < (gpu->v0.x + gpu->xsiz); x++) {
+                for (uint32_t y = gpu->v0.y; y < (gpu->v0.y + gpu->ysiz); y++)
+                    for (uint32_t x = gpu->v0.x; x < (gpu->v0.x + gpu->xsiz); x++)
                         if ((x >= gpu->draw_x1) && (x <= gpu->draw_x2) && (y >= gpu->draw_y1) && (y <= gpu->draw_y2))
                             VRAM(x, y) = color;
-                    }
-                }
 
                 gpu->state = GPU_STATE_RECV_CMD;
             }
@@ -1581,9 +1578,9 @@ void psx_gpu_update_cmd(psx_gpu_t* gpu) {
             /* To-do: Implement mask bit thing */
         } break;
         default: {
-            // log_set_quiet(0);
-            // log_fatal("Unhandled GP0(%02Xh)", gpu->buf[0] >> 24);
-            // log_set_quiet(1);
+            //  // log_set_quiet(0);
+            //  // log_fatal("Unhandled GP0(%02Xh)", gpu->buf[0] >> 24);
+            //  // log_set_quiet(1);
 
             // exit(1);
         } break;
@@ -1673,21 +1670,21 @@ void psx_gpu_write32(psx_gpu_t* gpu, uint32_t offset, uint32_t value) {
                 } break;
             }
 
-            log_error("GP1(%02Xh) args=%06x", value >> 24, value & 0xffffff);
+             // log_error("GP1(%02Xh) args=%06x", value >> 24, value & 0xffffff);
 
             return;
         } break;
     }
 
-    log_warn("Unhandled 32-bit GPU write at offset %08x (%08x)", offset, value);
+     // log_warn("Unhandled 32-bit GPU write at offset %08x (%08x)", offset, value);
 }
 
 void psx_gpu_write16(psx_gpu_t* gpu, uint32_t offset, uint16_t value) {
-    log_warn("Unhandled 16-bit GPU write at offset %08x (%04x)", offset, value);
+     // log_warn("Unhandled 16-bit GPU write at offset %08x (%04x)", offset, value);
 }
 
 void psx_gpu_write8(psx_gpu_t* gpu, uint32_t offset, uint8_t value) {
-    log_warn("Unhandled 8-bit GPU write at offset %08x (%02x)", offset, value);
+     // log_warn("Unhandled 8-bit GPU write at offset %08x (%02x)", offset, value);
 }
 
 void psx_gpu_set_event_callback(psx_gpu_t* gpu, int event, psx_gpu_event_callback_t cb) {
@@ -1764,4 +1761,40 @@ void* psx_gpu_get_display_buffer(psx_gpu_t* gpu) {
 void psx_gpu_destroy(psx_gpu_t* gpu) {
     free(gpu->vram);
     free(gpu);
+}
+
+uint32_t bus_gpu_read32(uint32_t addr, void* udata) {
+    psx_gpu_t* gpu = (psx_gpu_t*)udata;
+
+    return psx_gpu_read32(gpu, addr);
+}
+
+uint32_t bus_gpu_read16(uint32_t addr, void* udata) {
+    psx_gpu_t* gpu = (psx_gpu_t*)udata;
+
+    return psx_gpu_read16(gpu, addr);
+}
+
+uint32_t bus_gpu_read8(uint32_t addr, void* udata) {
+    psx_gpu_t* gpu = (psx_gpu_t*)udata;
+
+    return psx_gpu_read8(gpu, addr);
+}
+
+void bus_gpu_write32(uint32_t addr, uint32_t data, void* udata) {
+    psx_gpu_t* gpu = (psx_gpu_t*)udata;
+
+    psx_gpu_write32(gpu, addr, data);
+}
+
+void bus_gpu_write16(uint32_t addr, uint32_t data, void* udata) {
+    psx_gpu_t* gpu = (psx_gpu_t*)udata;
+
+    psx_gpu_write16(gpu, addr, data);
+}
+
+void bus_gpu_write8(uint32_t addr, uint32_t data, void* udata) {
+    psx_gpu_t* gpu = (psx_gpu_t*)udata;
+
+    psx_gpu_write8(gpu, addr, data);
 }

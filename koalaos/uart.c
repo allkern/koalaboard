@@ -1,5 +1,6 @@
 #include "mmio.h"
 #include "uart.h"
+#include "printf.h"
 
 void uart_init() {
     mmio_write_8(UART_IER, 0);
@@ -14,16 +15,13 @@ void uart_init() {
 }
 
 void uart_send_byte(int c) {
-    // while (!(mmio_read_8(UART_LSR) & LSR_TX_EMPTY)) {
-    //     mmio_write_32(0x9f800000, 1);
-    // }
+    while (!(mmio_read_8(UART_LSR) & LSR_TX_EMPTY));
 
     mmio_write_8(UART_THR, c);
 }
 
 int uart_recv_byte() {
-    if (mmio_read_8(UART_LSR) & LSR_RX_READY)
-        return mmio_read_8(UART_RHR);
+    while (!(mmio_read_8(UART_LSR) & LSR_RX_READY));
 
-    return -1;
+    return mmio_read_8(UART_RHR);
 }

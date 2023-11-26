@@ -1,11 +1,11 @@
-#include "console.h"
+#include "tty.h"
 #include "printf.h"
 
 #include <stdarg.h>
 
 void print_string(const char* str) {
     while (*str)
-        _putchar(*str++);
+        tty_putchar(*str++);
 }
 
 static char digits[] = "0123456789abcdef";
@@ -30,12 +30,12 @@ void print_int(int n, int base, int sign) {
         buf[i++] = '-';
 
     while(--i >= 0)
-        _putchar(buf[i]);
+        tty_putchar(buf[i]);
 }
 
 void print_ptr(uintptr_t x) {
     for (int i = 0; i < (sizeof(uintptr_t) * 2); i++, x <<= 4)
-        _putchar(digits[x >> (sizeof(uintptr_t) * 8 - 4)]);
+        tty_putchar(digits[x >> (sizeof(uintptr_t) * 8 - 4)]);
 }
 
 int kprintf(const char* fmt, ...) {
@@ -71,13 +71,17 @@ int kprintf(const char* fmt, ...) {
                 uintptr_t p = __builtin_va_arg(args, uintptr_t);
 
                 print_ptr(p);
+            } else if (f == 'c') {
+                int c = __builtin_va_arg(args, int);
+
+                tty_putchar(c);
             } else if (f == '%') {
-                _putchar('%');
+                tty_putchar('%');
             } else {
                 return 0;
             }
         } else {
-            _putchar(*fmt);
+            tty_putchar(*fmt);
         }
 
         ++fmt;

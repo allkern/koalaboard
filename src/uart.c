@@ -6,9 +6,15 @@
 #include <stdio.h>
 
 uint8_t handle_rhr_read(uart_t* uart) {
-    uart->lsr &= ~LSR_RX_READY;
+    uint8_t rhr = uart->rhr;
 
-    return uart->rhr;
+    fflush(stdout);
+    fflush(stdin);
+    
+    uart->lsr &= ~LSR_RX_READY;
+    uart->rhr = -1;
+
+    return rhr;
 }
 
 void handle_thr_write(uart_t* uart, uint8_t data) {
@@ -60,11 +66,11 @@ uint32_t uart_read8(uint32_t addr, void* udata) {
     uart_t* uart = (uart_t*)udata;
 
     switch (addr) {
-        case UART_RHR: printf("rhr read %02x\n", uart->rhr); return handle_rhr_read(uart);
-        case UART_IER: printf("ier read %02x\n", uart->ier); return uart->ier;
-        case UART_IIR: printf("iir read %02x\n", uart->iir); return uart->iir;
-        case UART_LCR: printf("lcr read %02x\n", uart->lcr); return uart->lcr;
-        case UART_LSR: printf("lsr read %02x\n", uart->lsr); return uart->lsr;
+        case UART_RHR: return handle_rhr_read(uart);
+        case UART_IER: return uart->ier;
+        case UART_IIR: return uart->iir;
+        case UART_LCR: return uart->lcr;
+        case UART_LSR: return uart->lsr;
     }
 
     return 0;

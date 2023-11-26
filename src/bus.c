@@ -41,6 +41,8 @@ bus_device_t* bus_register_device(bus_t* bus, uint32_t io_start, uint32_t io_end
     }
 
     bus->devices[bus->device_count++] = dev;
+
+    return dev;
 }
 
 bus_device_t* search_device(bus_t* bus, uint32_t addr) {
