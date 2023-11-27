@@ -21,11 +21,17 @@ bin/main main.c:
 	mkdir -p bin
 
 	$(CC) $(SOURCES) -o bin/main \
+		-DVERSION_TAG=$(VERSION_TAG) \
+		-DCOMMIT_HASH=$(COMMIT_HASH) \
+		-DOS_INFO=$(OS_INFO) \
 		-Isrc -g $(CFLAGS)
 
 koalaos:
 	$(KOS_CC) koalaos/*.c -o koalaos.elf \
 		-Ikoalaos \
+		-DVERSION_TAG="$(VERSION_TAG)" \
+		-DCOMMIT_HASH="$(COMMIT_HASH)" \
+		-DOS_INFO="$(OS_INFO)" \
 		$(KOS_CFLAGS)
 
 clean:

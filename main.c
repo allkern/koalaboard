@@ -465,7 +465,7 @@ int main(int argc, const char* argv[]) {
     dma_bdev->udata   = dma;
 
     screen_init(screen, gpu, uart);
-    screen_set_scale(screen, 3);
+    screen_set_scale(screen, 2);
     screen_reload(screen);
 
     elf_file_t* elf = elf_create();

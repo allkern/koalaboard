@@ -6,6 +6,25 @@
 #include "gpu.h"
 #include "font/vga16.h"
 
+#ifdef _MSC_VER
+#define __COMPILER__ "msvc"
+#elif __GNUC__
+#define __COMPILER__ "gcc"
+#endif
+
+#ifndef OS_INFO
+#define OS_INFO unknown
+#endif
+#ifndef VERSION_TAG
+#define VERSION_TAG latest
+#endif
+#ifndef COMMIT_HASH
+#define COMMIT_HASH latest
+#endif
+
+#define STR1(m) #m
+#define STR(m) STR1(m)
+
 int strcmp(const char *s1, const char *s2) {
 	while (*s1 == *s2++)
 		if (*s1++ == '\0')
@@ -17,7 +36,7 @@ void exit(int code) {
     mmio_write_32(VMC_EXIT, code);
 }
 
-int x = 0, y = 0;
+int xy = 0;
 
 uint16_t get_char_uv(int c) {
 #ifdef USE_FONT8
@@ -51,7 +70,22 @@ void shell() {
 
             if (!strcmp(buf, "help")) {
                 kprintf("Available commands:\n");
-                kprintf("help - Show a list of available commands\n");
+                kprintf("clear      - Clears the screen\n");
+                kprintf("help       - Show a list of available commands\n");
+                kprintf("ver        - Display KoalaOS' version information\n");
+            } else if (!strcmp(buf, "ver")) {
+                kprintf("KoalaOS 0.1-%s (%s %s %s)\n",
+                    STR(COMMIT_HASH),
+                    __COMPILER__,
+                    __VERSION__,
+                    STR(OS_INFO)
+                );
+            } else if (!strcmp(buf, "clear")) {
+                xy = 0;
+
+                mmio_write_32(GPU_GP0, 0x02010101);
+                mmio_write_32(GPU_GP0, 0x00000000);
+                mmio_write_32(GPU_GP0, 0x01e00280);
             } else {
                 kprintf("Unrecognized command \'%s\'\n", buf);
             }
@@ -92,16 +126,16 @@ int main() {
 
 void gpu_putchar(int c) {
     if (c == '\n') {
-        x = 0;
+        xy &= 0xffff0000;
 
 #ifdef USE_FONT8
-        y += 0x80000;
+        xy += 0x80000;
 #else
-        y += 0x100000;
+        xy += 0x100000;
 #endif
         return;
     } else if (c == '\r') {
-        x = 0;
+        xy &= 0xffff0000;
 
         return;
     }
@@ -109,7 +143,7 @@ void gpu_putchar(int c) {
     uint16_t uv = get_char_uv(c);
 
     mmio_write_32(GPU_GP0, 0x65000000);
-    mmio_write_32(GPU_GP0, y | x);
+    mmio_write_32(GPU_GP0, xy);
     mmio_write_32(GPU_GP0, 0x78000000 | uv);
 
 #ifdef USE_FONT8
@@ -118,7 +152,7 @@ void gpu_putchar(int c) {
     mmio_write_32(GPU_GP0, 0x00100008);
 #endif
 
-    x += 8;
+    xy += 8;
 }
 
 /*
@@ -170,7 +204,7 @@ void __start() {
 #endif
 
     uint32_t clut[] = {
-        0xffff0421, 0x00000000,
+        0x63180421, 0x00000000,
         0x00000000, 0x00000000,
         0x00000000, 0x00000000,
         0x00000000, 0x00000000
@@ -186,7 +220,13 @@ void __start() {
     // Set up texpage (x=640, y=0, enable drawing)
     mmio_write_32(GPU_GP0, 0xe100040a);
 
-    kprintf("[%s] GPU init done\n", __FUNCTION__);
-
     exit(main());
 }
+
+// DOS palette
+// uint32_t g_palette[] = {
+//     0x000000ff, 0x800000ff, 0x008000ff, 0x808000ff,
+//     0x000080ff, 0x800080ff, 0x008080ff, 0xc0c0c0ff,
+//     0x808080ff, 0xff0000ff, 0x00ff00ff, 0xffff00ff,
+//     0x0000ffff, 0xff00ffff, 0x00ffffff, 0xffffffff
+// };
