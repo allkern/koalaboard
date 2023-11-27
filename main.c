@@ -506,6 +506,8 @@ int main(int argc, const char* argv[]) {
 
             uint32_t vaddr = phdr->p_vaddr;
 
+            elf_load_segment(elf, i, &ram->buf[offset + (vaddr & 0xfff)]);
+
             for (int s = 0; s < segments; s++) {
                 cpu->tlb[seg].hi = vaddr & 0xfffff000;
                 cpu->tlb[seg].lo = ((offset + RAM_PHYS_BASE) & 0xfffff000) | TLBE_G | TLBE_V | TLBE_D;
@@ -514,15 +516,15 @@ int main(int argc, const char* argv[]) {
                     seg,
                     cpu->tlb[seg].hi,
                     cpu->tlb[seg].lo,
-                    offset + (phdr->p_vaddr & 0xfff)
+                    offset + (vaddr & 0xfff)
                 );
 
-                elf_load_segment(elf, i, &ram->buf[offset + (phdr->p_vaddr & 0xfff)]);
-
-                offset += elf->phdr[i]->p_align;
+                offset += 0x1000;
                 vaddr += 0x1000;
                 ++seg;
             }
+
+            offset += phdr->p_align;
         }
     }
 
