@@ -74,7 +74,7 @@ uint32_t bus_read32(uint32_t addr, void* udata) {
 
     // Bus error
     if (!dev)
-        return 0xffffffff;
+        return 0xdeadc0de;
 
     return dev->read32(addr - dev->io_start, dev->udata);
 }
@@ -86,7 +86,7 @@ uint32_t bus_read16(uint32_t addr, void* udata) {
 
     // Bus error
     if (!dev)
-        return 0xffffffff;
+        return 0xbaad;
 
     return dev->read16(addr - dev->io_start, dev->udata);
 }
@@ -98,7 +98,7 @@ uint32_t bus_read8(uint32_t addr, void* udata) {
 
     // Bus error
     if (!dev)
-        return 0xffffffff;
+        return 0xf0;
 
     return dev->read8(addr - dev->io_start, dev->udata);
 }

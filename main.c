@@ -505,21 +505,22 @@ int main(int argc, const char* argv[]) {
             printf("%u segments required\n", segments);
 
             uint32_t vaddr = phdr->p_vaddr;
+            uint32_t paddr = phdr->p_paddr;
 
-            elf_load_segment(elf, i, &ram->buf[offset + (vaddr & 0xfff)]);
+            elf_load_segment(elf, i, &ram->buf[paddr]);
 
             for (int s = 0; s < segments; s++) {
                 cpu->tlb[seg].hi = vaddr & 0xfffff000;
-                cpu->tlb[seg].lo = ((offset + RAM_PHYS_BASE) & 0xfffff000) | TLBE_G | TLBE_V | TLBE_D;
+                cpu->tlb[seg].lo = ((paddr + RAM_PHYS_BASE) & 0xfffff000) | TLBE_G | TLBE_V | TLBE_D;
 
                 printf("Loading TLB index %u v 0x%08x -> p 0x%08x segment @ 0x%08x\n",
                     seg,
                     cpu->tlb[seg].hi,
                     cpu->tlb[seg].lo,
-                    offset + (vaddr & 0xfff)
+                    paddr
                 );
 
-                offset += 0x1000;
+                paddr += 0x1000;
                 vaddr += 0x1000;
                 ++seg;
             }
@@ -557,7 +558,7 @@ int main(int argc, const char* argv[]) {
         // fflush(stdout);
         // getchar();
 
-        if (cpu->opcode == 0xffffffff)
+        if (cpu->opcode == 0xdeadc0de)
             break;
     }
 

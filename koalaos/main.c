@@ -4,6 +4,7 @@
 #include "tty.h"
 #include "uart.h"
 #include "gpu.h"
+#include "font.h"
 
 void exit(int code) {
     mmio_write_32(VMC_EXIT, code);
@@ -78,6 +79,8 @@ void __start() {
     uart_init();
     tty_init(uart_send_byte, uart_recv_byte);
 
+    kprintf("[%s] Initializing GPU... ", __FUNCTION__);
+
     // Reset GPU
     mmio_write_32(GPU_GP1, 0x00000000);
 
@@ -88,6 +91,8 @@ void __start() {
     mmio_write_32(GPU_GP0, 0xe3000000);
     mmio_write_32(GPU_GP0, 0xe4078280);
 
+    kprintf("done\n");
+
     // Draw a 640x480 blue rectangle (fast)
     mmio_write_32(GPU_GP0, 0x0200ff00);
     mmio_write_32(GPU_GP0, 0x00000000);
@@ -95,11 +100,13 @@ void __start() {
 
     // Send our texture to the GPU
     mmio_write_32(GPU_GP0, 0xa0000000);
-    // mmio_write_32(GPU_GP0, 0x01e00280);
-    // mmio_write_32(GPU_GP0, 0x00100010);
+    mmio_write_32(GPU_GP0, 0x00000280);
+    mmio_write_32(GPU_GP0, 0x00800080);
 
-    // for (int i = 0; i < ((16 * 16) >> 1); i++)
-    //     mmio_write_32(GPU_GP0, g_texture[i]);
+    uint32_t* ptr = (uint32_t*)g_font;
+
+    for (int i = 0; i < ((128 * 128) >> 3); i++)
+        mmio_write_32(GPU_GP0, *ptr++);
 
     exit(main());
 }
