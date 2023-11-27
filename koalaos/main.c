@@ -4,7 +4,7 @@
 #include "tty.h"
 #include "uart.h"
 #include "gpu.h"
-#include "font.h"
+#include "font/vga16.h"
 
 int strcmp(const char *s1, const char *s2) {
 	while (*s1 == *s2++)
@@ -20,7 +20,11 @@ void exit(int code) {
 int x = 0, y = 0;
 
 uint16_t get_char_uv(int c) {
+#ifdef USE_FONT8
     return ((c & 0xf0) << 7) | ((c & 0xf) << 3);
+#else
+    return ((c & 0xf0) << 8) | ((c & 0xf) << 3);
+#endif
 }
 
 void shell() {
@@ -29,10 +33,14 @@ void shell() {
 
     for (int i = 0; i < 64; i++)
         buf[i] = 0;
+    
+    kprintf("\r> %s", buf);
 
     int c = tty_getchar();
 
     while (1) {
+        kprintf("\r> %s", buf);
+
         while (c == -1)
             c = tty_getchar();
 
@@ -68,6 +76,8 @@ void shell() {
 
         next:
 
+        kprintf("\r> %s", buf);
+
         c = tty_getchar();
     }
 }
@@ -75,18 +85,20 @@ void shell() {
 int main() {
     kprintf("Welcome to KoalaOS!\n\n");
 
-    tty_putchar('>');
-
     shell();
 
-    return 0xaa;
+    return 0;
 }
 
 void gpu_putchar(int c) {
     if (c == '\n') {
         x = 0;
-        y += 0x80000;
 
+#ifdef USE_FONT8
+        y += 0x80000;
+#else
+        y += 0x100000;
+#endif
         return;
     } else if (c == '\r') {
         x = 0;
@@ -96,9 +108,15 @@ void gpu_putchar(int c) {
 
     uint16_t uv = get_char_uv(c);
 
-    mmio_write_32(GPU_GP0, 0x75000000);
+    mmio_write_32(GPU_GP0, 0x65000000);
     mmio_write_32(GPU_GP0, y | x);
     mmio_write_32(GPU_GP0, 0x78000000 | uv);
+
+#ifdef USE_FONT8
+    mmio_write_32(GPU_GP0, 0x00080008);
+#else
+    mmio_write_32(GPU_GP0, 0x00100008);
+#endif
 
     x += 8;
 }
@@ -131,20 +149,28 @@ void __start() {
     mmio_write_32(GPU_GP0, 0xe4078280);
 
     // Clear the screen (fast)
-    mmio_write_32(GPU_GP0, 0x02000000);
+    mmio_write_32(GPU_GP0, 0x02010101);
     mmio_write_32(GPU_GP0, 0x00000000);
     mmio_write_32(GPU_GP0, 0x01e00280);
 
     // Upload font to GPU
     mmio_write_32(GPU_GP0, 0xa0000000);
     mmio_write_32(GPU_GP0, 0x00000280);
+
+#ifdef USE_FONT8
     mmio_write_32(GPU_GP0, 0x00400020);
 
-    for (int i = 0; i < FONT_SIZE; i++)
-        mmio_write_32(GPU_GP0, g_font[i]);
+    for (int i = 0; i < FONT8_SIZE; i++)
+        mmio_write_32(GPU_GP0, g_font_vga8[i]);
+#else
+    mmio_write_32(GPU_GP0, 0x00800020);
+
+    for (int i = 0; i < FONT16_SIZE; i++)
+        mmio_write_32(GPU_GP0, g_font_vga16[i]);
+#endif
 
     uint32_t clut[] = {
-        0xffff0000, 0x00000000,
+        0xffff0421, 0x00000000,
         0x00000000, 0x00000000,
         0x00000000, 0x00000000,
         0x00000000, 0x00000000
