@@ -6,8 +6,21 @@
 #include "gpu.h"
 #include "font.h"
 
+int strcmp(const char *s1, const char *s2) {
+	while (*s1 == *s2++)
+		if (*s1++ == '\0')
+			return (0);
+	return (*(const unsigned char *)s1 - *(const unsigned char *)(s2 - 1));
+}
+
 void exit(int code) {
     mmio_write_32(VMC_EXIT, code);
+}
+
+int x = 0, y = 0;
+
+uint16_t get_char_uv(int c) {
+    return ((c & 0xf0) << 7) | ((c & 0xf) << 3);
 }
 
 void shell() {
@@ -28,7 +41,14 @@ void shell() {
 
             tty_putchar('\n');
 
-            kprintf("command=%s\n", buf);
+            if (!strcmp(buf, "help")) {
+                kprintf("Available commands:\n");
+                kprintf("help - Show a list of available commands\n");
+            } else {
+                kprintf("Unrecognized command \'%s\'\n", buf);
+            }
+
+            tty_putchar('\n');
 
             for (int i = 0; i < 64; i++)
                 buf[i] = 0;
@@ -53,13 +73,34 @@ void shell() {
 }
 
 int main() {
-    kprintf("Welcome to KoalaOS!\n");
+    kprintf("Welcome to KoalaOS!\n\n");
 
     tty_putchar('>');
 
     shell();
 
     return 0xaa;
+}
+
+void gpu_putchar(int c) {
+    if (c == '\n') {
+        x = 0;
+        y += 0x80000;
+
+        return;
+    } else if (c == '\r') {
+        x = 0;
+
+        return;
+    }
+
+    uint16_t uv = get_char_uv(c);
+
+    mmio_write_32(GPU_GP0, 0x75000000);
+    mmio_write_32(GPU_GP0, y | x);
+    mmio_write_32(GPU_GP0, 0x78000000 | uv);
+
+    x += 8;
 }
 
 /*
@@ -77,9 +118,7 @@ GP1(08h) - Display mode
 
 void __start() {
     uart_init();
-    tty_init(uart_send_byte, uart_recv_byte);
-
-    kprintf("[%s] Initializing GPU... ", __FUNCTION__);
+    tty_init(gpu_putchar, uart_recv_byte);
 
     // Reset GPU
     mmio_write_32(GPU_GP1, 0x00000000);
@@ -91,22 +130,37 @@ void __start() {
     mmio_write_32(GPU_GP0, 0xe3000000);
     mmio_write_32(GPU_GP0, 0xe4078280);
 
-    kprintf("done\n");
-
-    // Draw a 640x480 blue rectangle (fast)
-    mmio_write_32(GPU_GP0, 0x0200ff00);
+    // Clear the screen (fast)
+    mmio_write_32(GPU_GP0, 0x02000000);
     mmio_write_32(GPU_GP0, 0x00000000);
     mmio_write_32(GPU_GP0, 0x01e00280);
 
-    // Send our texture to the GPU
+    // Upload font to GPU
     mmio_write_32(GPU_GP0, 0xa0000000);
     mmio_write_32(GPU_GP0, 0x00000280);
-    mmio_write_32(GPU_GP0, 0x00800080);
+    mmio_write_32(GPU_GP0, 0x00400020);
 
-    uint32_t* ptr = (uint32_t*)g_font;
+    for (int i = 0; i < FONT_SIZE; i++)
+        mmio_write_32(GPU_GP0, g_font[i]);
 
-    for (int i = 0; i < ((128 * 128) >> 3); i++)
-        mmio_write_32(GPU_GP0, *ptr++);
+    uint32_t clut[] = {
+        0xffff0000, 0x00000000,
+        0x00000000, 0x00000000,
+        0x00000000, 0x00000000,
+        0x00000000, 0x00000000
+    };
+
+    mmio_write_32(GPU_GP0, 0xa0000000);
+    mmio_write_32(GPU_GP0, 0x01e00000);
+    mmio_write_32(GPU_GP0, 0x00010010);
+
+    for (int i = 0; i < 8; i++)
+        mmio_write_32(GPU_GP0, clut[i]);
+
+    // Set up texpage (x=640, y=0, enable drawing)
+    mmio_write_32(GPU_GP0, 0xe100040a);
+
+    kprintf("[%s] GPU init done\n", __FUNCTION__);
 
     exit(main());
 }
