@@ -4,33 +4,9 @@
 #include "tty.h"
 #include "uart.h"
 #include "gpu.h"
+#include "string.h"
 #include "font/vga16.h"
-
-#ifdef _MSC_VER
-#define __COMPILER__ "msvc"
-#elif __GNUC__
-#define __COMPILER__ "gcc"
-#endif
-
-#ifndef OS_INFO
-#define OS_INFO unknown
-#endif
-#ifndef VERSION_TAG
-#define VERSION_TAG latest
-#endif
-#ifndef COMMIT_HASH
-#define COMMIT_HASH latest
-#endif
-
-#define STR1(m) #m
-#define STR(m) STR1(m)
-
-int strcmp(const char *s1, const char *s2) {
-	while (*s1 == *s2++)
-		if (*s1++ == '\0')
-			return (0);
-	return (*(const unsigned char *)s1 - *(const unsigned char *)(s2 - 1));
-}
+#include "config.h"
 
 void exit(int code) {
     mmio_write_32(VMC_EXIT, code);
@@ -74,16 +50,17 @@ void shell() {
                 kprintf("help       - Show a list of available commands\n");
                 kprintf("ver        - Display KoalaOS' version information\n");
             } else if (!strcmp(buf, "ver")) {
-                kprintf("KoalaOS 0.1-%s (%s %s %s)\n",
+                kprintf("KoalaOS 0.1-%s (%s %s %s %s)\n",
                     STR(COMMIT_HASH),
                     __COMPILER__,
+                    __ARCH__,
                     __VERSION__,
                     STR(OS_INFO)
                 );
             } else if (!strcmp(buf, "clear")) {
                 xy = 0;
 
-                mmio_write_32(GPU_GP0, 0x02010101);
+                mmio_write_32(GPU_GP0, 0x02080808);
                 mmio_write_32(GPU_GP0, 0x00000000);
                 mmio_write_32(GPU_GP0, 0x01e00280);
             } else {
@@ -183,7 +160,7 @@ void __start() {
     mmio_write_32(GPU_GP0, 0xe4078280);
 
     // Clear the screen (fast)
-    mmio_write_32(GPU_GP0, 0x02010101);
+    mmio_write_32(GPU_GP0, 0x02080808);
     mmio_write_32(GPU_GP0, 0x00000000);
     mmio_write_32(GPU_GP0, 0x01e00280);
 
