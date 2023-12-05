@@ -107,6 +107,10 @@ void screen_update(screen_t* screen) {
 
             case SDL_KEYDOWN: {
                 switch (event.key.keysym.sym) {
+                    case SDLK_ESCAPE: {
+                        uart_send_byte(screen->uart, 0x1b);
+                    } break;
+
                     case SDLK_RETURN: {
                         uart_send_byte(screen->uart, '\r');
                     } break;

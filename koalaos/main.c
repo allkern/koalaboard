@@ -5,7 +5,7 @@
 #include "uart.h"
 #include "gpu.h"
 #include "string.h"
-#include "font/vga8.h"
+#include "font/vga16.h"
 #include "config.h"
 #include "c8.h"
 
@@ -160,8 +160,6 @@ int get_c8_key(int k) {
 }
 
 void chip8() {
-    xy = 0;
-
     mmio_write_32(GPU_GP0, 0x02080808);
     mmio_write_32(GPU_GP0, 0x00000000);
     mmio_write_32(GPU_GP0, 0x01e00280);
@@ -173,13 +171,28 @@ void chip8() {
 
     while (1) {
         // Wait for GPU IRQ
-        while ((mmio_read_32(0x9f801070) & 1) == 0);
+        while (!(mmio_read_32(0x9f801070) & 1));
 
         // Acknowledge GPU IRQ
         mmio_write_32(0x9f801070, ~1ul);
 
         if (mmio_read_8(UART_LSR) & LSR_RX_READY) {
-            int k = get_c8_key(mmio_read_8(UART_RHR));
+            int data = mmio_read_8(UART_RHR);
+
+            // Exit emulator
+            if (data == 0x1b) {
+                xy = 0;
+
+                mmio_write_32(GPU_GP0, 0x02080808);
+                mmio_write_32(GPU_GP0, 0x00000000);
+                mmio_write_32(GPU_GP0, 0x01e00280);
+
+                kprintf("Exited\n");
+
+                return;
+            }
+
+            int k = get_c8_key(data);
 
             if (k != -1) {
                 c8_keydown(&c8, k);
@@ -236,6 +249,7 @@ void shell() {
             if (!strcmp(buf, "help")) {
                 kprintf("Available commands:\n");
                 kprintf("clear      - Clears the screen\n");
+                kprintf("chip8      - Launch CHIP-8 emulator\n");
                 kprintf("help       - Show a list of available commands\n");
                 kprintf("ver        - Display KoalaOS' version information\n");
             } else if (!strcmp(buf, "ver")) {

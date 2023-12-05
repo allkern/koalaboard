@@ -109,21 +109,9 @@ void c8_i_add(chip8_t* c8) {
 }
 
 void c8_i_sub(chip8_t* c8) {
-    tty_init(uart_send_byte, uart_recv_byte);
-    kprintf("input: v[X:%x]=%u, v[Y:%x]=%u v[F]=%u\n",
-        X, c8->v[X],
-        Y, c8->v[Y],
-        c8->v[15]
-    );
     int flag = c8->v[X] > c8->v[Y];
 
     c8->v[X] -= c8->v[Y];
-    c8->v[15] = flag;
-    kprintf("resul: v[X:%x]=%u, v[Y:%x]=%u v[15]=%u\n",
-        X, c8->v[X],
-        Y, c8->v[Y],
-        c8->v[15]
-    );
 }
 
 void c8_i_shr(chip8_t* c8) {

@@ -543,7 +543,7 @@ int main(int argc, const char* argv[]) {
 
     while (screen_is_open(screen) && !vmc->exit_requested) {
         r3000_cycle(cpu);
-        psx_gpu_update(gpu, 2);
+        psx_gpu_update(gpu, 1);
 
         // printf("r0=%08x at=%08x v0=%08x v1=%08x\n", cpu->r[0] , cpu->r[1] , cpu->r[2] , cpu->r[3] );
         // printf("a0=%08x a1=%08x a2=%08x a3=%08x\n", cpu->r[4] , cpu->r[5] , cpu->r[6] , cpu->r[7] );
