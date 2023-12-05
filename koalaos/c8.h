@@ -109,7 +109,7 @@ void c8_i_add(chip8_t* c8) {
 }
 
 void c8_i_sub(chip8_t* c8) {
-    int flag = c8->v[X] > c8->v[Y];
+    int flag = c8->v[X] >= c8->v[Y];
 
     c8->v[X] -= c8->v[Y];
     c8->v[15] = flag;
@@ -123,7 +123,7 @@ void c8_i_shr(chip8_t* c8) {
 }
 
 void c8_i_subn(chip8_t* c8) {
-    int flag = c8->v[Y] > c8->v[X];
+    int flag = c8->v[Y] >= c8->v[X];
 
     c8->v[X] = c8->v[Y] - c8->v[X];
     c8->v[15] = flag;
