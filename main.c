@@ -500,7 +500,7 @@ int main(int argc, const char* argv[]) {
         free(pt_name);
 
         if (elf->phdr[i]->p_type == PT_LOAD) {
-            int segments = (phdr->p_memsz >> 12) + ((phdr->p_memsz & 0xfff) ? 1 : 0);
+            int segments = (phdr->p_memsz >> 12) + ((phdr->p_memsz & 0xfff) ? 1 : 0) + 1;
 
             printf("%u segments required\n", segments);
 

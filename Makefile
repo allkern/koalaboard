@@ -6,7 +6,7 @@ CC := gcc
 CFLAGS := -g -DLOG_USE_COLOR -Ofast -lSDL2 -lSDL2main
 
 KOS_CC := mipsel-linux-gnu-gcc
-KOS_CFLAGS := -static -nostdlib -EL -O3 -fno-tree-loop-distribute-patterns
+KOS_CFLAGS := -static -nostdlib -EL -fno-tree-loop-distribute-patterns
 KOS_CFLAGS += -march=r3000 -mtune=r3000 -mfp32
 
 VERSION_TAG := $(shell git describe --always --tags --abbrev=0)
