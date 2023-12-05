@@ -1,4 +1,8 @@
 #ifdef MACHINE_UART_ONLY
+#undef MACHINE_UART_ONLY
+#endif
+
+#ifdef MACHINE_UART_ONLY
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -356,6 +360,8 @@ void uart_tx_event(uint8_t data) {
 int default_query_access_cycles(void* udata) {
     return 0;
 }
+
+#undef main
 
 int main(int argc, const char* argv[]) {
     bus_t* bus = bus_create();
