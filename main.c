@@ -262,6 +262,7 @@ int main(int argc, const char* argv[]) {
 #include "gpu.h"
 #include "dma.h"
 #include "ic.h"
+#include "nvs.h"
 
 #include "screen.h"
 
@@ -338,15 +339,24 @@ char* get_pt_name(uint32_t pt) {
     return buf;
 }
 
+/*
+    Koalaboard physical memory map:
+    00000000-1f7fffff - Empty
+    1f800000-1f801818 - MMIO registers
+    80000000-81000000 - RAM (16 MiB)
+*/
+
 #define RAM_PHYS_BASE  0x80000000
 #define VMC_PHYS_BASE  0x1f800000
 #define UART_PHYS_BASE 0x1f900000
+#define NVS_PHYS_BASE  0x1fa00000
 #define GPU_PHYS_BASE  0x1f801810
 #define DMA_PHYS_BASE  0x1f801080
 #define IC_PHYS_BASE   0x1f801070
 #define RAM_SIZE       0x1000000
 #define VMC_SIZE       0x100
 #define UART_SIZE      0x8
+#define NVS_SIZE       0x10
 #define GPU_SIZE       0x8
 #define DMA_SIZE       0x100
 #define IC_SIZE        0x8
@@ -410,6 +420,17 @@ int main(int argc, const char* argv[]) {
     uart_t* uart = uart_create();
     uart_init(uart, uart_tx_event);
     uart_init_bus_device(uart, uart_bdev);
+
+    bus_device_t* nvs_bdev = bus_register_device(
+        bus,
+        NVS_PHYS_BASE,
+        NVS_PHYS_BASE + NVS_SIZE
+    );
+
+    nvs_t* nvs = nvs_create();
+    nvs_init(nvs);
+    nvs_open(nvs, "disk.bin");
+    nvs_init_bus_device(nvs, nvs_bdev);
 
     bus_device_t* ic_bdev = bus_register_device(
         bus,

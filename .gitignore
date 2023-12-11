@@ -1,4 +1,6 @@
 SDL2-2.26.5/
 sdl2-win64/
 .vscode/
+bin/
 *.exe
+*.bin
