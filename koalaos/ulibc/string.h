@@ -1,3 +1,6 @@
+#ifndef STRING_H
+#define STRING_H
+
 void* memset(void *dst, int c, unsigned int n);
 int memcmp(const void *v1, const void *v2, unsigned int n);
 void* memmove(void *dst, const void *src, unsigned int n);
@@ -7,3 +10,5 @@ int strncmp(const char *p, const char *q, unsigned int n);
 char* strncpy(char *s, const char *t, int n);
 char* s_strcpy(char *s, const char *t, int n);
 int strlen(const char *s);
+
+#endif

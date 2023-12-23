@@ -568,6 +568,15 @@ int main(int argc, const char* argv[]) {
 
     r3000_set_pc(cpu, elf->ehdr->e_entry);
 
+    printf("MMIO devices:\n");
+
+    for (int i = 0; i < bus->device_count; i++) {
+        printf("Device at physical range: %08x-%08x\n",
+            bus->devices[i]->io_start,
+            bus->devices[i]->io_end
+        );
+    }
+
     while (screen_is_open(screen) && !vmc->exit_requested) {
         r3000_cycle(cpu);
         psx_gpu_update(gpu, 1);
