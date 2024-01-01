@@ -1,10 +1,9 @@
 #ifndef C8_H
 #define C8_H
 
-#include <stdint.h>
-#include "printf.h"
-#include "uart.h"
-#include "tty.h"
+#include "libc/stdint.h"
+#include "hw/uart.h"
+#include "sys/tty.h"
 
 typedef struct {
     uint8_t* screen;

@@ -11,6 +11,11 @@ typedef struct {
     int exit_requested;
 } vmc_t;
 
+#define VMC_EXIT 0
+#define VMC_PUTCHAR 4
+#define VMC_TIMEL 8
+#define VMC_TIMEH 12
+
 vmc_t* vmc_create();
 void vmc_init(vmc_t*);
 int vmc_query_access_cycles(void*);

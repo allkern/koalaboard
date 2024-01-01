@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "nvs.h"
 
@@ -16,6 +17,11 @@ void cmd_read_sector(nvs_t* nvs) {
 }
 
 void cmd_write_sector(nvs_t* nvs) {
+    // printf("NVS: Writing sector at %08x (sector %u)\n",
+    //     nvs->rw_lba * NVS_SECTOR_SIZE,
+    //     nvs->rw_lba
+    // );
+
     fseek(nvs->file, nvs->rw_lba * NVS_SECTOR_SIZE, SEEK_SET);
     fwrite(nvs->rw_buf, 1, NVS_SECTOR_SIZE, nvs->file);
 
@@ -66,7 +72,7 @@ void nvs_init(nvs_t* nvs) {
 }
 
 void nvs_open(nvs_t* nvs, const char* path) {
-    nvs->file = fopen(path, "rwb");
+    nvs->file = fopen(path, "r+b");
 
     if (!nvs->file) {
         printf("Could not open disk image \'%s\'\n", path);
@@ -140,8 +146,11 @@ void nvs_write32(uint32_t addr, uint32_t data, void* udata) {
         case NVS_REG_CMD: {
             nvs->cmd = data;
 
-            if (data == NVS_CMD_READ_SECTOR)
+            if (data == NVS_CMD_READ_SECTOR) {
                 cmd_read_sector(nvs);
+            } else if (data == NVS_CMD_WRITE_SECTOR) {
+                nvs->status |= NVS_STAT_IODREQ;
+            }
         } break;
 
         case NVS_REG_STAT: {

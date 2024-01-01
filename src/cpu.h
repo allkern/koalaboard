@@ -10,8 +10,11 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#define R3000_CPS 33868800 // 33868800 Clocks/s
-#define R3000_FREQ 33.868800f // 33.868800 MHz
+// #define R3000_CPS 33868800 // 33868800 Clocks/s
+// #define R3000_FREQ 33.868800f // 33.868800 MHz
+
+#define R3000_CPS 30_000000 // 100000000 Clocks/s
+#define R3000_FREQ 30.000000f // 100.000000 MHz
 
 struct r3000_t;
 

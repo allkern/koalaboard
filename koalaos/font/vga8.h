@@ -1,7 +1,10 @@
+#ifndef VGA16_H
+#define VGA16_H
+
 #define FONT8_SIZE 2048
 #define USE_FONT8
 
-#include <stdint.h>
+#include "libc/stdint.h"
 
 static const uint32_t g_font_vga8[] = {
     0x00000000, 0x01111110, 0x01111110, 0x00110110, 0x00001000, 0x00011100, 0x00001000, 0x00000000,
@@ -261,3 +264,5 @@ static const uint32_t g_font_vga8[] = {
     0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00011000, 0x00001110, 0x00000000, 0x00000000,
     0x00000000, 0x00000000, 0x00000000, 0x00111000, 0x00000000, 0x00000000, 0x00000000, 0x00000000
 };
+
+#endif

@@ -1,15 +1,34 @@
-#include "mmio.h"
-#include "vmc.h"
-#include "printf.h"
-#include "tty.h"
-#include "uart.h"
-#include "gpu.h"
-#include "string.h"
-#include "font/vga16.h"
+#include "libc/string.h"
+#include "libc/stdio.h"
+#include "util/mmio.h"
+#include "hw/uart.h"
+#include "hw/vmc.h"
+#include "hw/gpu.h"
 #include "config.h"
 #include "c8.h"
 
-void gpu_putchar(int);
+int tohex(char c) {
+    c &= ~32;
+
+    if      (c == '0') return 0x0;
+    else if (c == '1') return 0x1;
+    else if (c == '2') return 0x2;
+    else if (c == '3') return 0x3;
+    else if (c == '4') return 0x4;
+    else if (c == '5') return 0x5;
+    else if (c == '6') return 0x6;
+    else if (c == '7') return 0x7;
+    else if (c == '8') return 0x8;
+    else if (c == '9') return 0x9;
+    else if (c == 'A') return 0xa;
+    else if (c == 'B') return 0xb;
+    else if (c == 'C') return 0xc;
+    else if (c == 'D') return 0xd;
+    else if (c == 'E') return 0xe;
+    else if (c == 'F') return 0xf;
+
+    return 0;
+}
 
 /* C:\Users\Lisandro\Downloads\Sierpinski [Sergey Naydenov, 2010].ch8 (12/5/2023 1:29:47 AM)
    StartOffset(h): 00000000, EndOffset(h): 00000208, Length(h): 00000209 */
@@ -61,20 +80,6 @@ unsigned char rawData[521] = {
 	0x00, 0x00, 0x00, 0x00, 0x00
 };
 
-void exit(int code) {
-    mmio_write_32(VMC_EXIT, code);
-}
-
-int xy = 0;
-
-uint16_t get_char_uv(int c) {
-#ifdef USE_FONT8
-    return ((c & 0xf0) << 7) | ((c & 0xf) << 3);
-#else
-    return ((c & 0xf0) << 8) | ((c & 0xf) << 3);
-#endif
-}
-
 chip8_t c8;
 uint8_t screen[64 * 32];
 uint8_t mem[0x1000];
@@ -100,9 +105,7 @@ int get_c8_key(int k) {
 }
 
 void chip8() {
-    mmio_write_32(GPU_GP0, 0x02080808);
-    mmio_write_32(GPU_GP0, 0x00000000);
-    mmio_write_32(GPU_GP0, 0x01e00280);
+    gpu_clear();
 
     c8_init(&c8, screen, mem);
     c8_load_program(&c8, rawData, sizeof(rawData));
@@ -121,13 +124,9 @@ void chip8() {
 
             // Exit emulator
             if (data == 0x1b) {
-                xy = 0;
+                gpu_clear();
 
-                mmio_write_32(GPU_GP0, 0x02080808);
-                mmio_write_32(GPU_GP0, 0x00000000);
-                mmio_write_32(GPU_GP0, 0x01e00280);
-
-                kprintf("Exited\n");
+                printf("Exited\n");
 
                 return;
             }
@@ -151,9 +150,7 @@ void chip8() {
         while (ips--)
             c8_execute_instruction(&c8);
 
-        mmio_write_32(GPU_GP0, 0x02080808);
-        mmio_write_32(GPU_GP0, 0x00000000);
-        mmio_write_32(GPU_GP0, 0x01e00280);
+        gpu_clear();
 
         for (int y = 0; y < 32; y++) {
             for (int x = 0; x < 64; x++) {
@@ -170,30 +167,30 @@ void shell() {
 
     for (int i = 0; i < 64; i++)
         buf[i] = 0;
-    
-    kprintf("\r> %s", buf);
 
-    int c = tty_getchar();
+    printf("\r> %s", buf);
+
+    int c = getchar();
 
     while (1) {
-        kprintf("\r> %s", buf);
+        printf("\r> %s", buf);
 
         while (c == -1)
-            c = tty_getchar();
+            c = getchar();
 
         if (c == '\r') {
             *ptr = 0;
 
-            tty_putchar('\n');
+            putchar('\n');
 
             if (!strcmp(buf, "help")) {
-                kprintf("Available commands:\n");
-                kprintf("clear      - Clears the screen\n");
-                kprintf("chip8      - Launch CHIP-8 emulator\n");
-                kprintf("help       - Show a list of available commands\n");
-                kprintf("ver        - Display KoalaOS' version information\n");
+                printf("Available commands:\n");
+                printf("clear      - Clears the screen\n");
+                printf("chip8      - Launch CHIP-8 emulator\n");
+                printf("help       - Show a list of available commands\n");
+                printf("ver        - Display KoalaOS' version information\n");
             } else if (!strcmp(buf, "ver")) {
-                kprintf("KoalaOS 0.1-%s (%s %s %s %s)\n",
+                printf("KoalaOS 0.1-%s (%s %s %s %s)\n",
                     STR(COMMIT_HASH),
                     __COMPILER__,
                     __ARCH__,
@@ -201,18 +198,17 @@ void shell() {
                     STR(OS_INFO)
                 );
             } else if (!strcmp(buf, "clear")) {
-                xy = 0;
-
-                mmio_write_32(GPU_GP0, 0x02080808);
-                mmio_write_32(GPU_GP0, 0x00000000);
-                mmio_write_32(GPU_GP0, 0x01e00280);
+                gpu_clear();
             } else if (!strcmp(buf, "chip8")) {
                 chip8();
+            } else if (!strcmp(buf, "color")) {
+                gpu_set_attribute(0x0a);
+                gpu_clear();
             } else {
-                kprintf("Unrecognized command \'%s\'\n", buf);
+                printf("Unrecognized command \'%s\'\n", buf);
             }
 
-            tty_putchar('\n');
+            putchar('\n');
 
             for (int i = 0; i < 64; i++)
                 buf[i] = 0;
@@ -228,127 +224,24 @@ void shell() {
 
         *ptr++ = c;
         
-        kprintf("\r> %s", buf);
+        printf("\r> %s", buf);
 
         next:
 
-        kprintf("\r> %s", buf);
+        printf("\r> %s", buf);
 
-        c = tty_getchar();
+        c = getchar();
     }
 }
 
+#include "sys/fs.h"
+
 int main() {
-    kprintf("Welcome to KoalaOS!\n\n");
+    printf("Welcome to KoalaOS!\n\n");
+
+    fs_list_directory("/");
 
     shell();
 
     return 0;
 }
-
-void gpu_putchar(int c) {
-    if (c == '\n') {
-        xy &= 0xffff0000;
-
-#ifdef USE_FONT8
-        xy += 0x80000;
-#else
-        xy += 0x100000;
-#endif
-        return;
-    } else if (c == '\r') {
-        xy &= 0xffff0000;
-
-        return;
-    }
-
-    uint16_t uv = get_char_uv(c);
-
-    mmio_write_32(GPU_GP0, 0x65000000);
-    mmio_write_32(GPU_GP0, xy);
-    mmio_write_32(GPU_GP0, 0x78000000 | uv);
-
-#ifdef USE_FONT8
-    mmio_write_32(GPU_GP0, 0x00080008);
-#else
-    mmio_write_32(GPU_GP0, 0x00100008);
-#endif
-
-    xy += 8;
-}
-
-/*
-GP1(08h) - Display mode
-
-  0-1   Horizontal Resolution 1     (0=256, 1=320, 2=512, 3=640) ;GPUSTAT.17-18
-  2     Vertical Resolution         (0=240, 1=480, when Bit5=1)  ;GPUSTAT.19
-  3     Video Mode                  (0=NTSC/60Hz, 1=PAL/50Hz)    ;GPUSTAT.20
-  4     Display Area Color Depth    (0=15bit, 1=24bit)           ;GPUSTAT.21
-  5     Vertical Interlace          (0=Off, 1=On)                ;GPUSTAT.22
-  6     Horizontal Resolution 2     (0=256/320/512/640, 1=368)   ;GPUSTAT.16
-  7     "Reverseflag"               (0=Normal, 1=Distorted)      ;GPUSTAT.14
-  8-23  Not used (zero)
-*/
-
-void __start() {
-    uart_init();
-    tty_init(gpu_putchar, uart_recv_byte);
-
-    // Reset GPU
-    mmio_write_32(GPU_GP1, 0x00000000);
-
-    // Set resolution to 640x480, NTSC, interlaced
-    mmio_write_32(GPU_GP1, 0x08000027);
-
-    // Set drawing area to 0,0-640,480
-    mmio_write_32(GPU_GP0, 0xe3000000);
-    mmio_write_32(GPU_GP0, 0xe4078280);
-
-    // Clear the screen (fast)
-    mmio_write_32(GPU_GP0, 0x02080808);
-    mmio_write_32(GPU_GP0, 0x00000000);
-    mmio_write_32(GPU_GP0, 0x01e00280);
-
-    // Upload font to GPU
-    mmio_write_32(GPU_GP0, 0xa0000000);
-    mmio_write_32(GPU_GP0, 0x00000280);
-
-#ifdef USE_FONT8
-    mmio_write_32(GPU_GP0, 0x00800020);
-
-    for (int i = 0; i < FONT8_SIZE; i++)
-        mmio_write_32(GPU_GP0, g_font_vga8[i]);
-#else
-    mmio_write_32(GPU_GP0, 0x01000020);
-
-    for (int i = 0; i < FONT16_SIZE; i++)
-        mmio_write_32(GPU_GP0, g_font_vga16[i]);
-#endif
-
-    uint32_t clut[] = {
-        0x63180421, 0x00000000,
-        0x00000000, 0x00000000,
-        0x00000000, 0x00000000,
-        0x00000000, 0x00000000
-    };
-
-    mmio_write_32(GPU_GP0, 0xa0000000);
-    mmio_write_32(GPU_GP0, 0x01e00000);
-    mmio_write_32(GPU_GP0, 0x00010010);
-
-    for (int i = 0; i < 8; i++)
-        mmio_write_32(GPU_GP0, clut[i]);
-
-    // Set up texpage (x=640, y=0, enable drawing)
-    mmio_write_32(GPU_GP0, 0xe100040a);
-
-    exit(main());
-}
-
-// DOS palette
-// uint32_t g_palette[] = {
-//     0x000000ff, 0x800000ff, 0x008000ff, 0x808000ff,
-//     0x000080ff, 0x800080ff, 0x008080ff, 0xc0c0c0ff,
-//     0x808080ff, 0xff0000ff, 0x00ff00ff, 0xffff00ff,
-//     0x0000ffff, 0xff00ffff, 0x00ffffff, 0xffffffff
-// };

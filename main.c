@@ -354,7 +354,7 @@ char* get_pt_name(uint32_t pt) {
 #define DMA_PHYS_BASE  0x1f801080
 #define IC_PHYS_BASE   0x1f801070
 #define RAM_SIZE       0x1000000
-#define VMC_SIZE       0x100
+#define VMC_SIZE       0x10
 #define UART_SIZE      0x8
 #define NVS_SIZE       0x10
 #define GPU_SIZE       0x8
@@ -429,7 +429,7 @@ int main(int argc, const char* argv[]) {
 
     nvs_t* nvs = nvs_create();
     nvs_init(nvs);
-    nvs_open(nvs, "disk.bin");
+    nvs_open(nvs, "disk.img");
     nvs_init_bus_device(nvs, nvs_bdev);
 
     bus_device_t* ic_bdev = bus_register_device(
@@ -504,6 +504,7 @@ int main(int argc, const char* argv[]) {
     puts("  Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align");
 
     int seg = 0;
+
     uint32_t offset = 0;
 
     for (int i = 0; i < elf->ehdr->e_phnum; i++) {
@@ -612,6 +613,7 @@ int main(int argc, const char* argv[]) {
 
     r3000_destroy(cpu);
     elf_destroy(elf);
+    nvs_destroy(nvs);
 
     return 0;
 }

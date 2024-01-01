@@ -882,6 +882,8 @@ void gpu_copy(psx_gpu_t* gpu) {
                 for (int y = 0; y < ysiz; y++)
                     for (int x = 0; x < xsiz; x++)
                         VRAM(dstx + x, dsty + y) = VRAM(srcx + x, srcy + y);
+
+                gpu->state = GPU_STATE_RECV_CMD;
             }
         } break;
     }
@@ -1735,8 +1737,8 @@ void psx_gpu_update(psx_gpu_t* gpu, int cyc) {
                       (gpu->cycles <= GPU_CYCLES_PER_SCANL_NTSC);
 
     // Convert CPU (~33.8 MHz) cycles to GPU (~53.7 MHz) cycles
-    // gpu->cycles += (float)cyc * (PSX_GPU_CLOCK_FREQ_NTSC / PSX_CPU_FREQ);
-    gpu->cycles += (float)cyc * (11.0f / 7.0f);
+    gpu->cycles += (float)cyc * (PSX_GPU_FREQ_NTSC / R3000_FREQ);
+    // gpu->cycles += (float)cyc * (11.0f / 7.0f);
 
     int curr_hblank = (gpu->cycles >= GPU_CYCLES_PER_HDRAW_NTSC) &&
                       (gpu->cycles <= GPU_CYCLES_PER_SCANL_NTSC);
