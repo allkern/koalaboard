@@ -77,23 +77,23 @@ void __start() {
 
     printf("ok\n");
 
-    nvs_read_sector(header, 0);
+    // nvs_read_sector(header, 0);
 
-    if (!strncmp(&header[0x200], "KFS", 3)) {
-        printf("Mounted disk0 at \"\\\"\n");
-    } else {
-        printf("Found NVS device at %x\n", NVS_PHYS_BASE);
-        printf("Formatting drive...\n");
+    // if (!strncmp(&header[0x200], "KFS", 3)) {
+    //     printf("Mounted disk0 at \"\\\"\n");
+    // } else {
+    //     printf("Found NVS device at %x\n", NVS_PHYS_BASE);
+    //     printf("Formatting drive...\n");
 
-        fs_format(header);
+    //     fs_format(header);
 
-        int foo = fs_create_directory("foo", 0);
-        int bar = fs_create_directory("bar", foo);
+    //     int foo = fs_create_directory("foo", 0);
+    //     int bar = fs_create_directory("bar", foo);
 
-        fs_create_file("myfile.txt", header, 0x1000, bar);
+    //     fs_create_file("myfile.txt", header, 0x1000, bar);
 
-        printf("Mounted disk0 at \"\\\"\n");
-    }
+    //     printf("Mounted disk0 at \"\\\"\n");
+    // }
 
     printf("Calling main...\n");
 
