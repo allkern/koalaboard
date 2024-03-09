@@ -5,7 +5,7 @@
 #include "font/vga16.h"
 #include "libc/stdio.h"
 #include "libc/stdlib.h"
-#include "sys/fs.h"
+#include "sys/fat32/fat32.h"
 
 int main(void);
 
@@ -16,6 +16,44 @@ void vmc_exit_wrapper(void) {
 }
 
 uint8_t header[0x1000];
+
+void fat32_init() {
+    disk_mount(DISK_NVS);
+
+	struct volume_s* tmp = volume_get('C');
+    struct volume_s* vol = volume_get_first();
+
+	while (vol) {
+		for (u8 i = 0; i < 11; i++) {
+			if (vol->label[i]) {
+				printf("%c", vol->label[i]);
+			}
+		}
+		printf(" (%c:)\n", vol->letter);
+		vol = vol->next;
+	}
+	printf("\n");
+
+    while (1);
+	
+	// // List all directories
+	// struct dir_s dir;
+	// fat_dir_open(&dir, "C:/alpha/", 0);
+	
+	// struct info_s* info = (struct info_s*)malloc(sizeof(struct info_s));
+	// fstatus status;
+	// printf("\nListing directories in: C:/alpha\n");
+	// do {
+	// 	status = fat_dir_read(&dir, info);
+
+	// 	// Print the information
+	// 	if (status == FSTATUS_OK) {
+	// 		fat_print_info(info);
+	// 	}
+	// } while (status != FSTATUS_EOF);
+
+    // while (1);
+}
 
 void __start() {
     // Basic init
@@ -60,6 +98,8 @@ void __start() {
     printf("Calling main...\n");
 
     gpu_clear();
+
+    fat32_init();
 
     // main call
     main_return_code = main();

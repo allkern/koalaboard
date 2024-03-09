@@ -31,8 +31,9 @@ koalaos:
 		koalaos/*.c \
 		koalaos/libc/*.c \
 		koalaos/sys/*.c \
+		koalaos/sys/fat32/*.c \
 		koalaos/hw/*.c \
-		 -o koalaos.elf \
+		-o koalaos.elf \
 		-Ikoalaos \
 		-DVERSION_TAG="$(VERSION_TAG)" \
 		-DCOMMIT_HASH="$(COMMIT_HASH)" \

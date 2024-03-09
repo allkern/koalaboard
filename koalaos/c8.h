@@ -115,7 +115,7 @@ void c8_i_sub(chip8_t* c8) {
 }
 
 void c8_i_shr(chip8_t* c8) {
-    int lsb = c8->v[X] & 1;
+    int lsb = c8->v[Y] & 1;
 
     c8->v[X] >>= 1;
     c8->v[15] = lsb != 0;
@@ -199,10 +199,10 @@ void c8_i_drw(chip8_t* c8) {
 
 void c8_i_key(chip8_t* c8) {
     if (I8 == 0x9e) {
-        if (c8->keypad[X])
+        if (c8->keypad[c8->v[X] & 0xf])
             c8->pc += 2;
     } else if (I8 == 0xa1) {
-        if (!c8->keypad[X])
+        if (!c8->keypad[c8->v[X] & 0xf])
             c8->pc += 2;
     } else {
         // Invalid instruction

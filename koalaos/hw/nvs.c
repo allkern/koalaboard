@@ -3,6 +3,10 @@
 #include "util/mmio.h"
 #include "libc/stdio.h"
 
+unsigned int nvs_get_status() {
+    return mmio_read_32(NVS_REG_STAT);
+}
+
 void nvs_zero_sector(uint32_t lba) {
     mmio_write_32(NVS_REG_LBA, lba);
     mmio_write_32(NVS_REG_CMD, NVS_CMD_WRITE_SECTOR);

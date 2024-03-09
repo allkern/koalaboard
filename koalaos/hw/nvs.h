@@ -27,6 +27,7 @@ enum {
     NVS_STAT_BUSY   = 0x80000000
 };
 
+unsigned int nvs_get_status();
 void nvs_read_sector(void* buf, uint32_t lba);
 void nvs_write_sector(void* buf, uint32_t lba);
 void nvs_zero_sector(uint32_t lba);
