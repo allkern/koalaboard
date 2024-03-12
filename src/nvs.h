@@ -7,7 +7,7 @@
 
 #include "bus.h"
 
-#define NVS_SECTOR_SIZE 0x1000
+#define NVS_SECTOR_SIZE 0x200
 
 enum {
     NVS_REG_DATA = 0x00,
@@ -27,8 +27,17 @@ enum {
 
 enum {
     NVS_STAT_IODREQ = 0x00000001,
+    NVS_STAT_PROBE  = 0x40000000,
     NVS_STAT_BUSY   = 0x80000000
 };
+
+typedef struct {
+    uint32_t type;
+    char model[128];
+    char manufacturer[32];
+    uint32_t sector_count;
+    uint32_t sector_size;
+} nvs_id;
 
 typedef struct {
     FILE* file;
@@ -44,12 +53,19 @@ typedef struct {
     uint8_t* rw_buf;
     uint32_t rw_bytes_remaining;
     uint32_t rw_buf_idx;
+
+    // ID
+    nvs_id id;
+} nvs_disk;
+
+typedef struct {
+    nvs_disk disk[4];
 } nvs_t;
 
 nvs_t* nvs_create();
 void nvs_init(nvs_t*);
-void nvs_open(nvs_t*, const char*);
-void nvs_close(nvs_t*);
+void nvs_open(nvs_t*, int, const char*);
+void nvs_close(nvs_t*, int);
 int nvs_query_access_cycles(void*);
 uint32_t nvs_read32(uint32_t, void*);
 uint32_t nvs_read16(uint32_t, void*);

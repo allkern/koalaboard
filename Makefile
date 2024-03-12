@@ -31,7 +31,7 @@ koalaos:
 		koalaos/*.c \
 		koalaos/libc/*.c \
 		koalaos/sys/*.c \
-		koalaos/sys/fat32/*.c \
+		koalaos/usr/*.c \
 		koalaos/hw/*.c \
 		-o koalaos.elf \
 		-Ikoalaos \

@@ -5,7 +5,9 @@
 #include "font/vga16.h"
 #include "libc/stdio.h"
 #include "libc/stdlib.h"
-#include "sys/fat32/fat32.h"
+#include "sys/fs.h"
+#include "usr/dir.h"
+#include "usr/shell.h"
 
 int main(void);
 
@@ -15,44 +17,32 @@ void vmc_exit_wrapper(void) {
     vmc_exit(main_return_code);
 }
 
-uint8_t header[0x1000];
+uint8_t buf[0x1000];
 
 void fat32_init() {
-    disk_mount(DISK_NVS);
+    printf("Scanning NVS bus...\n");
 
-	struct volume_s* tmp = volume_get('C');
-    struct volume_s* vol = volume_get_first();
+    int i;
 
-	while (vol) {
-		for (u8 i = 0; i < 11; i++) {
-			if (vol->label[i]) {
-				printf("%c", vol->label[i]);
-			}
-		}
-		printf(" (%c:)\n", vol->letter);
-		vol = vol->next;
-	}
-	printf("\n");
+    for (i = 0; i < 4; i++) {
+        int status = nvs_get_status(i);
 
-    while (1);
-	
-	// // List all directories
-	// struct dir_s dir;
-	// fat_dir_open(&dir, "C:/alpha/", 0);
-	
-	// struct info_s* info = (struct info_s*)malloc(sizeof(struct info_s));
-	// fstatus status;
-	// printf("\nListing directories in: C:/alpha\n");
-	// do {
-	// 	status = fat_dir_read(&dir, info);
+        if (nvs_get_status(i) & NVS_STAT_PROBE) {
+            nvs_read_ident(i, buf);
 
-	// 	// Print the information
-	// 	if (status == FSTATUS_OK) {
-	// 		fat_print_info(info);
-	// 	}
-	// } while (status != FSTATUS_EOF);
+            nvs_id* id = (nvs_id*)buf;
 
-    // while (1);
+            if (id->type) {
+                printf("  Mounting drive %u: %s %s... ", i, id->manufacturer, id->model);
+
+                if (disk_mount(i)) {
+                    printf("ok\n");
+                }
+            }
+        }
+    }
+
+    current_volume = volume_get_first();
 }
 
 void __start() {
@@ -77,29 +67,11 @@ void __start() {
 
     printf("ok\n");
 
-    // nvs_read_sector(header, 0);
-
-    // if (!strncmp(&header[0x200], "KFS", 3)) {
-    //     printf("Mounted disk0 at \"\\\"\n");
-    // } else {
-    //     printf("Found NVS device at %x\n", NVS_PHYS_BASE);
-    //     printf("Formatting drive...\n");
-
-    //     fs_format(header);
-
-    //     int foo = fs_create_directory("foo", 0);
-    //     int bar = fs_create_directory("bar", foo);
-
-    //     fs_create_file("myfile.txt", header, 0x1000, bar);
-
-    //     printf("Mounted disk0 at \"\\\"\n");
-    // }
+    fat32_init();
 
     printf("Calling main...\n");
 
     gpu_clear();
-
-    fat32_init();
 
     // main call
     main_return_code = main();

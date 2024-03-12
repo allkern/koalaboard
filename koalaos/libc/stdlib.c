@@ -1,8 +1,13 @@
 #include "stdint.h"
 #include "stdlib.h"
+#include "stdio.h"
+#include "ctype.h"
 
 void* __ram_start = 0;
 void* __ram_end = 0;
+
+uint8_t __memory[0x1000 * 32];
+__alloc_block __blocks[32];
 
 static __alloc_block* __alloc_blocks;
 static int __alloc_blocks_size;
@@ -13,7 +18,12 @@ void (*__atexit_func_array[ATEXIT_MAX])(void);
 static int __atexit_func_index;
 
 void __libc_init_stdlib(void) {
-    __alloc_blocks = (__alloc_block*)__ram_start;
+    __ram_start = __memory;
+    __alloc_blocks = __blocks;
+    __alloc_blocks_size = 32;
+
+    for (int i = 0; i < 32; i++)
+        __blocks[i].free = 1;
 }
 
 int atexit(void (*func)(void)) {
@@ -58,4 +68,20 @@ void* realloc(void* ptr, size_t new_size) {
 
 void free(void* ptr) {
     __alloc_blocks[((uintptr_t)ptr) >> ALLOC_BLOCK_SHIFT].free = 0;
+}
+
+int atoi(const char *s) {
+	int n=0, neg=0;
+
+	while (isspace(*s)) s++;
+
+	switch (*s) {
+        case '-': neg=1;
+        case '+': s++;
+	}
+	/* Compute n as a negative number to avoid overflow on INT_MIN */
+	while (isdigit(*s))
+		n = 10*n - (*s++ - '0');
+
+	return neg ? n : -n;
 }

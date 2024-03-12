@@ -76,17 +76,17 @@ static const r3000_instruction_t g_r3000_bxx_table[] = {
 };
 
 static const uint32_t g_r3000_cop0_write_mask_table[] = {
-    0x00000000, // cop0r0   - N/A
-    0x00000000, // cop0r1   - N/A
-    0x00000000, // cop0r2   - N/A
+    0xffffffff, // cop0r0   - N/A
+    0xffffffff, // cop0r1   - N/A
+    0xffffffff, // cop0r2   - N/A
     0xffffffff, // BPC      - Breakpoint on execute (R/W)
-    0x00000000, // cop0r4   - N/A
+    0xffffffff, // cop0r4   - N/A
     0xffffffff, // BDA      - Breakpoint on data access (R/W)
     0x00000000, // JUMPDEST - Randomly memorized jump address (R)
     0xffc0f03f, // DCIC     - Breakpoint control (R/W)
     0x00000000, // BadVaddr - Bad Virtual Address (R)
     0xffffffff, // BDAM     - Data Access breakpoint mask (R/W)
-    0x00000000, // cop0r10  - N/A
+    0xffffffff, // cop0r10  - N/A
     0xffffffff, // BPCM     - Execute breakpoint mask (R/W)
     0xffffffff, // SR       - System status register (R/W)
     0x00000300, // CAUSE    - Describes the most recently recognised exception (R)
@@ -1341,6 +1341,13 @@ void r3000_i_mtc0(r3000_t* cpu) {
 }
 
 void r3000_i_rfe(r3000_t* cpu) {
+    switch (SOP) {
+        case 1: r3000_i_tlbr(cpu); return;
+        case 2: r3000_i_tlbwi(cpu); return;
+        case 6: r3000_i_tlbwr(cpu); return;
+        case 8: r3000_i_tlbp(cpu); return;
+    }
+
     TRACE_N("rfe");
 
     DO_PENDING_LOAD;

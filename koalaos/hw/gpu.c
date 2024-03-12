@@ -33,8 +33,30 @@ void gpu_scroll_down(void) {
     mmio_write_32(GPU_GP0, h | 640);
 }
 
+uint32_t gpu_get_xpos(void) {
+    return xy & 0xffff;
+}
+
+void gpu_set_xpos(uint32_t x) {
+    xy &= 0xffff0000;
+    xy |= x;
+}
+
+uint32_t gpu_get_ypos(void) {
+    return xy >> 16;
+}
+
+void gpu_set_ypos(uint32_t y) {
+    xy &= 0xffff;
+    xy |= y << 16;
+}
+
 uint32_t gpu_get_pos(void) {
     return xy;
+}
+
+void gpu_set_pos(uint32_t pos) {
+    xy = pos;
 }
 
 void gpu_putchar(int c) {
@@ -99,9 +121,13 @@ void gpu_restore_attribute() {
 }
 
 void gpu_clear() {
-    // To-do: Clear using BG color
+    uint32_t b = rgb555_palette[(attr >> 4) & 0xf];
 
-    mmio_write_32(GPU_GP0, 0x02080808);
+    b = ((b & 0x001f) << 3) |
+        ((b & 0x03e0) << 6) |
+        ((b & 0x7c00) << 9);
+
+    mmio_write_32(GPU_GP0, 0x02000000 | b);
     mmio_write_32(GPU_GP0, 0x00000000);
     mmio_write_32(GPU_GP0, 0x01e00280);
 

@@ -21,5 +21,6 @@ void* realloc(void* ptr, size_t new_size);
 void free(void* ptr);
 void exit();
 int atexit(void (*func)(void));
+int atoi(const char *s);
 
 #endif

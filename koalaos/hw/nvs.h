@@ -3,14 +3,14 @@
 
 #include "libc/stdint.h"
 
-#define NVS_SECTOR_SIZE 0x1000
+#define NVS_SECTOR_SIZE 0x200
 #define NVS_PHYS_BASE 0x9fa00000
 
 enum {
-    NVS_REG_DATA = NVS_PHYS_BASE + 0x00,
-    NVS_REG_LBA  = NVS_PHYS_BASE + 0x04,
-    NVS_REG_CMD  = NVS_PHYS_BASE + 0x08,
-    NVS_REG_STAT = NVS_PHYS_BASE + 0x0c
+    NVS_REG_DATA = 0x9fa00000,
+    NVS_REG_LBA  = 0x9fa00004,
+    NVS_REG_CMD  = 0x9fa00008,
+    NVS_REG_STAT = 0x9fa0000c
 };
 
 enum {
@@ -24,12 +24,22 @@ enum {
 
 enum {
     NVS_STAT_IODREQ = 0x00000001,
+    NVS_STAT_PROBE  = 0x40000000,
     NVS_STAT_BUSY   = 0x80000000
 };
 
-unsigned int nvs_get_status();
-void nvs_read_sector(void* buf, uint32_t lba);
-void nvs_write_sector(void* buf, uint32_t lba);
-void nvs_zero_sector(uint32_t lba);
+typedef struct {
+    uint32_t type;
+    char model[128];
+    char manufacturer[32];
+    uint32_t sector_count;
+    uint32_t sector_size;
+} nvs_id;
+
+unsigned int nvs_get_status(int index);
+void nvs_read_sector(int index, void* buf, uint32_t lba);
+void nvs_write_sector(int index, void* buf, uint32_t lba);
+void nvs_zero_sector(int index, uint32_t lba);
+void nvs_read_ident(int index, void* buf);
 
 #endif

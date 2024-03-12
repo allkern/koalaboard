@@ -1,5 +1,6 @@
 #include "stdio.h"
 #include "stdarg.h"
+#include "ctype.h"
 
 struct STDIO {
     int (*read)(void);
@@ -65,19 +66,19 @@ void __libc_init_stdio(int (*read)(void), void (*write)(int)) {
     stderr = &__stdout;
 }
 
-int printf(const char* fmt, ...) {
-    va_list args;
+// int printf(const char* fmt, ...) {
+//     va_list args;
 
-    va_start(args, fmt);
+//     va_start(args, fmt);
 
-    int n = vfprintf(stdout, fmt, args);
+//     int n = vfprintf(stdout, fmt, args);
 
-    va_end(args);
+//     va_end(args);
 
-    return n;
-}
+//     return n;
+// }
 
-int sprintf(char* buf, const char* fmt, ...);
+// int sprintf(char* buf, const char* fmt, ...);
 int snprintf(char* buf, size_t size, const char* fmt, ...);
 int getc(FILE* file) {
     if (!(file->mode & IOR))
@@ -165,6 +166,8 @@ int fputs(const char* str, FILE* file) {
 
     while (str[i])
         fputc(str[i++], file);
+
+    fputc('\n', file);
 
     return i;
 }

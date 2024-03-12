@@ -356,7 +356,7 @@ char* get_pt_name(uint32_t pt) {
 #define RAM_SIZE       0x1000000
 #define VMC_SIZE       0x10
 #define UART_SIZE      0x8
-#define NVS_SIZE       0x10
+#define NVS_SIZE       0x40
 #define GPU_SIZE       0x8
 #define DMA_SIZE       0x100
 #define IC_SIZE        0x8
@@ -391,8 +391,7 @@ int main(int argc, const char* argv[]) {
     r3000_t* cpu = r3000_create();
     r3000_init(cpu, &cpu_bus);
 
-    bus_device_t* ram_bdev = bus_register_device(
-        bus,
+    bus_device_t* ram_bdev = bus_register_device(bus,
         RAM_PHYS_BASE,
         RAM_PHYS_BASE + RAM_SIZE
     );
@@ -429,7 +428,7 @@ int main(int argc, const char* argv[]) {
 
     nvs_t* nvs = nvs_create();
     nvs_init(nvs);
-    nvs_open(nvs, "disk.img");
+    nvs_open(nvs, 0, "disk.img");
     nvs_init_bus_device(nvs, nvs_bdev);
 
     bus_device_t* ic_bdev = bus_register_device(
