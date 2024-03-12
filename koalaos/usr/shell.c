@@ -114,10 +114,6 @@ void handle_command(char* buf) {
             init_argv(buf);
             HACK_argv_fix(__argc);
 
-            printf("calling %s (at %p) with argc=%u argv=%p\n",
-                sef[i].name, sef[i].fn, __argc, __argv
-            );
-
             // To-do: Do something with return value
             sef[i].fn(__argc, (const char**)__argv);
 
