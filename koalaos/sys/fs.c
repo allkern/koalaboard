@@ -1,3 +1,4 @@
+// Code extracted from https://github.com/strawberryhacker/fat32
 // FAT32 implementation
 
 // DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE

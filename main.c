@@ -263,6 +263,7 @@ int main(int argc, const char* argv[]) {
 #include "dma.h"
 #include "ic.h"
 #include "nvs.h"
+#include "rom.h"
 
 #include "screen.h"
 
@@ -341,25 +342,31 @@ char* get_pt_name(uint32_t pt) {
 
 /*
     Koalaboard physical memory map:
-    00000000-1f7fffff - Empty
+    00000000-0000ffff - Firmware RAM (64 KiB)
+    00010000-1f7fffff - Empty
     1f800000-1f801818 - MMIO registers
+    1fc00000-1fc10000 - Firmware ROM (64 KiB)
     80000000-81000000 - RAM (16 MiB)
 */
 
-#define RAM_PHYS_BASE  0x80000000
-#define VMC_PHYS_BASE  0x1f800000
-#define UART_PHYS_BASE 0x1f900000
-#define NVS_PHYS_BASE  0x1fa00000
-#define GPU_PHYS_BASE  0x1f801810
-#define DMA_PHYS_BASE  0x1f801080
-#define IC_PHYS_BASE   0x1f801070
-#define RAM_SIZE       0x1000000
-#define VMC_SIZE       0x10
-#define UART_SIZE      0x8
-#define NVS_SIZE       0x40
-#define GPU_SIZE       0x8
-#define DMA_SIZE       0x100
-#define IC_SIZE        0x8
+#define RAM_PHYS_BASE       0x80000000
+#define BOOTRAM_PHYS_BASE   0x00000000
+#define VMC_PHYS_BASE       0x1f800000
+#define UART_PHYS_BASE      0x1f900000
+#define NVS_PHYS_BASE       0x1fa00000
+#define GPU_PHYS_BASE       0x1f801810
+#define DMA_PHYS_BASE       0x1f801080
+#define IC_PHYS_BASE        0x1f801070
+#define ROM_PHYS_BASE       0x1fc00000
+#define RAM_SIZE            0x1000000
+#define BOOTRAM_SIZE        0x10000
+#define VMC_SIZE            0x10
+#define UART_SIZE           0x8
+#define NVS_SIZE            0x40
+#define GPU_SIZE            0x8
+#define DMA_SIZE            0x100
+#define IC_SIZE             0x8
+#define ROM_SIZE            0x10000
 
 void uart_tx_event(uint8_t data) {
     putchar((char)data);
@@ -391,13 +398,22 @@ int main(int argc, const char* argv[]) {
     r3000_t* cpu = r3000_create();
     r3000_init(cpu, &cpu_bus);
 
+    bus_device_t* bootram_bdev = bus_register_device(bus,
+        BOOTRAM_PHYS_BASE,
+        BOOTRAM_PHYS_BASE + BOOTRAM_SIZE
+    );
+
+    ram_t* bootram = ram_create();
+    ram_init(bootram, BOOTRAM_SIZE);
+    ram_init_bus_device(bootram, bootram_bdev);
+
     bus_device_t* ram_bdev = bus_register_device(bus,
         RAM_PHYS_BASE,
         RAM_PHYS_BASE + RAM_SIZE
     );
 
     ram_t* ram = ram_create();
-    ram_init(ram, 0x1000000);
+    ram_init(ram, RAM_SIZE);
     ram_init_bus_device(ram, ram_bdev);
 
     bus_device_t* vmc_bdev = bus_register_device(
@@ -448,6 +464,16 @@ int main(int argc, const char* argv[]) {
     ic_bdev->write16 = bus_ic_write16;
     ic_bdev->write8  = bus_ic_write8;
     ic_bdev->udata   = ic;
+
+    bus_device_t* rom_bdev = bus_register_device(
+        bus,
+        ROM_PHYS_BASE,
+        ROM_PHYS_BASE + ROM_SIZE
+    );
+
+    rom_t* rom = rom_create();
+    rom_init(rom, "bin/boot.bin");
+    rom_init_bus_device(rom, rom_bdev);
 
     bus_device_t* gpu_bdev = bus_register_device(
         bus,
@@ -565,6 +591,9 @@ int main(int argc, const char* argv[]) {
     cpu->r[30] = cpu->r[29];
 
     printf("Setting PC to entry address %08x\n", elf->ehdr->e_entry);
+
+    // Set BEV (exception vector)
+    cpu->cop0_r[COP0_SR] = 0x400000;
 
     r3000_set_pc(cpu, elf->ehdr->e_entry);
 

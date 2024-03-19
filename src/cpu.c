@@ -239,7 +239,7 @@ void r3000_destroy(r3000_t* cpu) {
     free(cpu);
 }
 
-uint32_t mmu_tlb_lookup(r3000_t* cpu, uint32_t key) {
+uint32_t tlb_lookup(r3000_t* cpu, uint32_t key) {
     uint32_t kvpn = key & TLBE_VPN;
     uint32_t kasid = key & TLBE_ASID;
 
@@ -291,10 +291,16 @@ uint32_t mmu_map_address(r3000_t* cpu, uint32_t virt, uint32_t* phys, int write)
     uint32_t offset = virt & 0xfff;
     uint32_t entry = (virt & 0xfffff000) | (cpu->cop0_r[COP0_ENTRYHI] & TLBE_ASID);
 
-    uint32_t index = mmu_tlb_lookup(cpu, entry);
+    uint32_t index = tlb_lookup(cpu, entry);
 
     if (index == MMU_ENOENT) {
         cpu->cop0_r[COP0_BADVADDR] = cpu->pc;
+
+        printf("MMU no entry pc=%08x addr=%08x write=%u\n",
+            cpu->pc,
+            virt,
+            write
+        );
 
         r3000_exception(cpu, write ? CAUSE_TLBS : CAUSE_TLBL);
 
@@ -429,6 +435,7 @@ void r3000_init(r3000_t* cpu, r3000_bus_t* bus) {
 
     cpu->cop0_r[COP0_SR] = 0x10900000;
     cpu->cop0_r[COP0_PRID] = 0x00000002;
+    cpu->cop0_r[COP0_RANDOM] = 63 << 8;
 }
 
 void r3000_cycle(r3000_t* cpu) {
@@ -458,6 +465,14 @@ void r3000_cycle(r3000_t* cpu) {
     cpu->last_cycles += 1;
     cpu->total_cycles += cpu->last_cycles;
 
+    // Update Random register
+    cpu->cop0_r[COP0_RANDOM] -= 2 << 8;
+
+    if (cpu->cop0_r[COP0_RANDOM] < (8 << 8))
+        cpu->cop0_r[COP0_RANDOM] += 63 << 8;
+
+    cpu->cop0_r[COP0_RANDOM] &= 0x3f00;
+
     cpu->r[0] = 0;
 }
 
@@ -470,6 +485,18 @@ void r3000_set_pc(r3000_t* cpu, uint32_t addr) {
     cpu->next_pc = cpu->pc + 4;
 }
 
+int is_memory_exception(uint32_t cause) {
+    if ((cause == CAUSE_ADEL) || // Address error
+        (cause == CAUSE_ADES) ||
+        (cause == CAUSE_IBE)  || // Bus error
+        (cause == CAUSE_DBE)  ||
+        (cause == CAUSE_MOD)  || // TLB error
+        (cause == CAUSE_TLBL) ||
+        (cause == CAUSE_TLBS)) return 1;
+
+    return 0;
+}
+
 void r3000_exception(r3000_t* cpu, uint32_t cause) {
     cpu->cop0_r[COP0_CAUSE] &= 0x0000ff00;
 
@@ -477,6 +504,15 @@ void r3000_exception(r3000_t* cpu, uint32_t cause) {
     cpu->cop0_r[COP0_CAUSE] &= 0xffffff80;
     cpu->cop0_r[COP0_CAUSE] |= cause;
 
+    // Set BadVaddr when exception is a memory exception else reset
+    cpu->cop0_r[COP0_BADVADDR] = is_memory_exception(cause) ?
+        cpu->saved_pc : 0;
+
+    // Update Context BadVPN field (and clear lower 2 bits)
+    cpu->cop0_r[COP0_CONTEXT] &= ~0x1fffff;
+    cpu->cop0_r[COP0_CONTEXT] |= cpu->saved_pc & 0x1ffffc;
+
+    // Save PC at which exception happened
     cpu->cop0_r[COP0_EPC] = cpu->saved_pc;
 
     if (cpu->delay_slot) {
@@ -484,9 +520,8 @@ void r3000_exception(r3000_t* cpu, uint32_t cause) {
         cpu->cop0_r[COP0_CAUSE] |= 0x80000000;
     }
 
-    if ((cause == CAUSE_INT) && (cpu->cop0_r[COP0_EPC] & 0xfe000000) == 0x4a000000) {
+    if ((cause == CAUSE_INT) && (cpu->cop0_r[COP0_EPC] & 0xfe000000) == 0x4a000000)
         cpu->cop0_r[COP0_EPC] += 4;
-    }
 
     // Do exception stack push
     uint32_t mode = cpu->cop0_r[COP0_SR] & 0x3f;
@@ -497,6 +532,8 @@ void r3000_exception(r3000_t* cpu, uint32_t cause) {
     // Set PC to the vector selected on BEV
     cpu->pc = (cpu->cop0_r[COP0_SR] & SR_BEV) ? 0xbfc00180 : 0x80000080;
     cpu->next_pc = cpu->pc + 4;
+
+    // printf("R3000 exception %08x %08x %08x\n", cause >> 2, cpu->saved_pc, cpu->pc);
 }
 
 void r3000_set_irq_pending(r3000_t* cpu) {
@@ -1363,12 +1400,13 @@ void r3000_i_tlbp(r3000_t* cpu) {
 
     DO_PENDING_LOAD;
 
-    uint32_t index = mmu_tlb_lookup(cpu, cpu->cop0_r[COP0_ENTRYHI]);
+    uint32_t index = tlb_lookup(cpu, cpu->cop0_r[COP0_ENTRYHI]);
 
     if (index == MMU_ENOENT) {
         cpu->cop0_r[COP0_INDEX] |= 0x80000000;
     } else {
-        cpu->cop0_r[COP0_INDEX] = index << 8;
+        cpu->cop0_r[COP0_INDEX] &= ~0x3f00;
+        cpu->cop0_r[COP0_INDEX] |= index << 8;
     }
 }
 

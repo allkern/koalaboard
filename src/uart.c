@@ -8,9 +8,6 @@
 uint8_t handle_rhr_read(uart_t* uart) {
     uint8_t rhr = uart->rhr;
 
-    fflush(stdout);
-    fflush(stdin);
-    
     uart->lsr &= ~LSR_RX_READY;
     uart->rhr = -1;
 

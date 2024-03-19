@@ -30,11 +30,7 @@ u8 disk_get_status(disk_e disk) {
 
 		nvs_id* id = (nvs_id*)sector;
 
-		if (id->type) {
-			return 1;
-		} else {
-			return 0;
-		}
+		return id->type ? 1 : 0;
 	}
 
 	return 0;

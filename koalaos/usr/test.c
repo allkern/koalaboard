@@ -2,6 +2,14 @@
 
 #include "sys/dmem.h"
 
+void irq_handler(void) {
+    printf("Hello, world! (from IRQ handler)\n");
+}
+
+void syscall(uint32_t num) {
+    asm("syscall");
+}
+
 int usr_test(int argc, const char* argv[]) {
     // printf("argc=%u argv=%p argv[0]=%p\n", argc, argv, argv[0]);
 
@@ -24,7 +32,6 @@ int usr_test(int argc, const char* argv[]) {
 
     int free_blocks = 0;
 
-
     for (int i = 0; i < TLB_ENTRY_COUNT; i++) {
         entry = tlb_read_entry(i);
 
@@ -36,6 +43,13 @@ int usr_test(int argc, const char* argv[]) {
         free_blocks * 4,
         64 - free_blocks
     );
+
+    syscall(irq_handler);
+
+    // Crash system
+    // *((int*)0) = 0;
+
+    free_blocks = 0;
 
     return EXIT_SUCCESS;
 }

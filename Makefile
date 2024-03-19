@@ -2,12 +2,22 @@
 
 .ONESHELL:
 
+CROSS_PREFIX := mipsel-linux-gnu
+
 CC := gcc
 CFLAGS := -g -DLOG_USE_COLOR -Ofast -lSDL2 -lSDL2main
 
-KOS_CC := mipsel-linux-gnu-gcc
+FW_SOURCES := boot/reset.s
+FW_SOURCES := boot/exception.s
+
+KOS_CC := gcc
 KOS_CFLAGS := -static -nostdlib -EL -fno-tree-loop-distribute-patterns
 KOS_CFLAGS += -march=r3000 -mtune=r3000 -mfp32 -ffreestanding -nostdinc
+KOS_SOURCES := $(wildcard koalaos/*.c)
+KOS_SOURCES += $(wildcard koalaos/libc/*.c)
+KOS_SOURCES += $(wildcard koalaos/sys/*.c)
+KOS_SOURCES += $(wildcard koalaos/usr/*.c)
+KOS_SOURCES += $(wildcard koalaos/hw/*.c)
 
 VERSION_TAG := $(shell git describe --always --tags --abbrev=0)
 COMMIT_HASH := $(shell git rev-parse --short HEAD)
@@ -27,18 +37,22 @@ bin/main main.c:
 		-Isrc -g $(CFLAGS)
 
 koalaos:
-	$(KOS_CC) \
-		koalaos/*.c \
-		koalaos/libc/*.c \
-		koalaos/sys/*.c \
-		koalaos/usr/*.c \
-		koalaos/hw/*.c \
-		-o koalaos.elf \
+	$(CROSS_PREFIX)-$(KOS_CC) \
+		$(KOS_SOURCES) \
+		-o bin/koalaos.elf \
 		-Ikoalaos \
 		-DVERSION_TAG="$(VERSION_TAG)" \
 		-DCOMMIT_HASH="$(COMMIT_HASH)" \
 		-DOS_INFO="$(OS_INFO)" \
 		$(KOS_CFLAGS)
 
+firmware:
+	mkdir -p build
+	mkdir -p bin
+
+	$(CROSS_PREFIX)-as $(FW_SOURCES) -o build/boot.o -mips1 -EL
+	$(CROSS_PREFIX)-ld build/boot.o -T boot/script.ld -o bin/boot.bin
+
 clean:
-	rm -rf "bin"
+	rm -rf bin
+	rm -rf build
