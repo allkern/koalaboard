@@ -1,8 +1,9 @@
 SDL2-2.26.5/
 sdl2-win64/
 .vscode/
-bin/
 build/
 *.exe
-*.bin
 *.img
+bin/koalaboard.exe
+bin/koalaboard
+nvram.bin

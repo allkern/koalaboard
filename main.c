@@ -379,11 +379,53 @@ int default_query_access_cycles(void* udata) {
     return 0;
 }
 
+static const char* g_desc_text =
+    "\nPlease report any bugs to <https://github.com/allkern/koalaboard/issues>\n";
+
+#include "argparse.h"
+
 #undef main
 
 int main(int argc, const char* argv[]) {
     bus_t* bus = bus_create();
     bus_init(bus);
+    
+    const char* nvram_path = "nvram.bin";
+    const char* nvs_path = "disk.img";
+    const char* rom_path = "rom.bin";
+    const char* elf_path = "main.elf";
+
+    static const char *const usages[] = {
+        "koalaboard [options] path-to-elf-executable",
+        NULL,
+    };
+
+    struct argparse_option options[] = {
+        OPT_BOOLEAN ('h', "help"      , NULL       , "Display this information", argparse_help_cb, 0, 0),
+        OPT_GROUP("Basic options"),
+        OPT_STRING  ('n', "nvram"     , &nvram_path, "Specify an NVRAM dump file", NULL, 0, 0),
+        OPT_STRING  ('d', "disk"      , &nvs_path  , "Specify a disk image file", NULL, 0, 0),
+        OPT_STRING  ('f', "firmware"  , &rom_path  , "Specify a firmware image file", NULL, 0, 0),
+        OPT_STRING  ('x', "executable", &elf_path  , "Specify an ELF executable"),
+        OPT_END()
+    };
+
+    struct argparse argparse;
+
+    argparse_init(&argparse, options, usages, 0);
+    argparse_describe(&argparse, NULL, g_desc_text);
+
+    argc = argparse_parse(&argparse, argc, argv);
+
+    if (argc) {
+        if (argc > 1) {
+            printf("Unrecognized parameter \'%s\'\n", argv[1]);
+
+            exit(1);
+        }
+
+        elf_path = argv[0];
+    }
 
     r3000_bus_t cpu_bus = {
         .query_access_cycles = bus_query_access_cycles,
@@ -405,7 +447,7 @@ int main(int argc, const char* argv[]) {
     );
 
     nvram_t* nvram = ram_create();
-    nvram_init(nvram, NVRAM_SIZE, "nvram.bin");
+    nvram_init(nvram, NVRAM_SIZE, nvram_path);
     nvram_init_bus_device(nvram, nvram_bdev);
 
     bus_device_t* ram_bdev = bus_register_device(bus,
@@ -445,7 +487,7 @@ int main(int argc, const char* argv[]) {
 
     nvs_t* nvs = nvs_create();
     nvs_init(nvs);
-    nvs_open(nvs, 0, "disk.img");
+    nvs_open(nvs, 0, nvs_path);
     nvs_init_bus_device(nvs, nvs_bdev);
 
     bus_device_t* ic_bdev = bus_register_device(
@@ -473,7 +515,7 @@ int main(int argc, const char* argv[]) {
     );
 
     rom_t* rom = rom_create();
-    rom_init(rom, "bin/boot.bin");
+    rom_init(rom, rom_path);
     rom_init_bus_device(rom, rom_bdev);
 
     bus_device_t* gpu_bdev = bus_register_device(
@@ -523,7 +565,7 @@ int main(int argc, const char* argv[]) {
 
     elf_file_t* elf = elf_create();
 
-    if (elf_load(elf, argv[1]))
+    if (elf_load(elf, elf_path))
         return 1;
 
     puts("Program Headers:");

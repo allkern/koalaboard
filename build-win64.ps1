@@ -13,8 +13,7 @@ gcc -I"`"$($KOALABOARD_DIR)`"" `
     -I"`"$($SDL2_DIR)\include`"" `
     -I"`"$($SDL2_DIR)\include\SDL2`"" `
     "src\*.c" `
-    "main.c" `
-    "screen.c" `
+    "*.c" `
     -o "bin\koalaboard.exe" `
     -DREP_VERSION="`"$($VERSION_TAG)`"" `
     -DREP_COMMIT_HASH="`"$($COMMIT_HASH)`"" `

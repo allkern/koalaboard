@@ -23,14 +23,13 @@ VERSION_TAG := $(shell git describe --always --tags --abbrev=0)
 COMMIT_HASH := $(shell git rev-parse --short HEAD)
 OS_INFO := $(shell uname -rmo)
 
-SOURCES := main.c
-SOURCES += screen.c
+SOURCES := $(wildcard *.c)
 SOURCES += $(wildcard src/*.c)
 
 bin/main main.c:
 	mkdir -p bin
 
-	$(CC) $(SOURCES) -o bin/main \
+	$(CC) $(SOURCES) -o bin/koalaboard \
 		-DVERSION_TAG="$(VERSION_TAG)" \
 		-DCOMMIT_HASH="$(COMMIT_HASH)" \
 		-DOS_INFO="$(OS_INFO)" \
@@ -51,7 +50,7 @@ firmware:
 	mkdir -p bin
 
 	$(CROSS_PREFIX)-as $(FW_SOURCES) -o build/boot.o -mips1 -EL
-	$(CROSS_PREFIX)-ld build/boot.o -T boot/script.ld -o bin/boot.bin
+	$(CROSS_PREFIX)-ld build/boot.o -T boot/script.ld -o bin/firmware.bin
 
 clean:
 	rm -rf bin
