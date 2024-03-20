@@ -264,6 +264,7 @@ int main(int argc, const char* argv[]) {
 #include "ic.h"
 #include "nvs.h"
 #include "rom.h"
+#include "nvram.h"
 
 #include "screen.h"
 
@@ -349,24 +350,24 @@ char* get_pt_name(uint32_t pt) {
     80000000-81000000 - RAM (16 MiB)
 */
 
-#define RAM_PHYS_BASE       0x80000000
-#define BOOTRAM_PHYS_BASE   0x00000000
-#define VMC_PHYS_BASE       0x1f800000
-#define UART_PHYS_BASE      0x1f900000
-#define NVS_PHYS_BASE       0x1fa00000
-#define GPU_PHYS_BASE       0x1f801810
-#define DMA_PHYS_BASE       0x1f801080
-#define IC_PHYS_BASE        0x1f801070
-#define ROM_PHYS_BASE       0x1fc00000
-#define RAM_SIZE            0x1000000
-#define BOOTRAM_SIZE        0x10000
-#define VMC_SIZE            0x10
-#define UART_SIZE           0x8
-#define NVS_SIZE            0x40
-#define GPU_SIZE            0x8
-#define DMA_SIZE            0x100
-#define IC_SIZE             0x8
-#define ROM_SIZE            0x10000
+#define RAM_PHYS_BASE   0x80000000
+#define NVRAM_PHYS_BASE 0x00000000
+#define VMC_PHYS_BASE   0x1f800000
+#define UART_PHYS_BASE  0x1f900000
+#define NVS_PHYS_BASE   0x1fa00000
+#define GPU_PHYS_BASE   0x1f801810
+#define DMA_PHYS_BASE   0x1f801080
+#define IC_PHYS_BASE    0x1f801070
+#define ROM_PHYS_BASE   0x1fc00000
+#define RAM_SIZE        0x1000000
+#define NVRAM_SIZE      0x10000
+#define VMC_SIZE        0x10
+#define UART_SIZE       0x8
+#define NVS_SIZE        0x40
+#define GPU_SIZE        0x8
+#define DMA_SIZE        0x100
+#define IC_SIZE         0x8
+#define ROM_SIZE        0x10000
 
 void uart_tx_event(uint8_t data) {
     putchar((char)data);
@@ -398,14 +399,14 @@ int main(int argc, const char* argv[]) {
     r3000_t* cpu = r3000_create();
     r3000_init(cpu, &cpu_bus);
 
-    bus_device_t* bootram_bdev = bus_register_device(bus,
-        BOOTRAM_PHYS_BASE,
-        BOOTRAM_PHYS_BASE + BOOTRAM_SIZE
+    bus_device_t* nvram_bdev = bus_register_device(bus,
+        NVRAM_PHYS_BASE,
+        NVRAM_PHYS_BASE + NVRAM_SIZE
     );
 
-    ram_t* bootram = ram_create();
-    ram_init(bootram, BOOTRAM_SIZE);
-    ram_init_bus_device(bootram, bootram_bdev);
+    nvram_t* nvram = ram_create();
+    nvram_init(nvram, NVRAM_SIZE, "nvram.bin");
+    nvram_init_bus_device(nvram, nvram_bdev);
 
     bus_device_t* ram_bdev = bus_register_device(bus,
         RAM_PHYS_BASE,
@@ -642,6 +643,7 @@ int main(int argc, const char* argv[]) {
     r3000_destroy(cpu);
     elf_destroy(elf);
     nvs_destroy(nvs);
+    nvram_destroy(nvram);
 
     return 0;
 }

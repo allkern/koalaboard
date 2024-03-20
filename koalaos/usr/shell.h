@@ -33,6 +33,7 @@ static char cmd[MAX_CMD];
 void usr_shell_init(void);
 void usr_shell_register(sef_proto fn, const char* name, const char* desc);
 void usr_shell(void);
+int shell_exec(const char* args);
 char* shell_get_cwd(void);
 struct sef_desc* shell_get_sef_desc(int i);
 char* shell_get_path(char* path);

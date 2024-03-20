@@ -100,7 +100,7 @@ void init_argv(char* buf) {
     }
 }
 
-void handle_command(char* buf) {
+int shell_exec(const char* buf) {
     __argc = 0;
 
     for (int i = 0; i < MAX_SEF_COUNT; i++) {
@@ -115,9 +115,7 @@ void handle_command(char* buf) {
             HACK_argv_fix(__argc);
 
             // To-do: Do something with return value
-            sef[i].fn(__argc, (const char**)__argv);
-
-            return;
+            return sef[i].fn(__argc, (const char**)__argv);
         }
     }
 
@@ -145,7 +143,7 @@ void usr_shell() {
 
                 *ptr = '\0';
 
-                handle_command(cmd);
+                shell_exec(cmd);
 
                 done:
 

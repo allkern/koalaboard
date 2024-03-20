@@ -319,7 +319,7 @@
 // }
 
 int main() {
-    puts("Welcome to KoalaOS!\nCopyright (C) 2024 Allkern/Lisandro Alarcon\n");
+    puts("Welcome to KoalaOS!\n\nCopyright (C) 2024 Allkern/Lisandro Alarcon\n");
 
     usr_shell_init();
     usr_shell();
