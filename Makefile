@@ -5,7 +5,7 @@
 CROSS_PREFIX := mipsel-linux-gnu
 
 CC := gcc
-CFLAGS := -g -DLOG_USE_COLOR -Ofast -lSDL2 -lSDL2main
+CFLAGS := -g -DLOG_USE_COLOR -Ofast -lSDL2 -lSDL2main -Wno-unused-result
 
 FW_SOURCES := boot/reset.s
 FW_SOURCES := boot/exception.s
@@ -23,17 +23,18 @@ VERSION_TAG := $(shell git describe --always --tags --abbrev=0)
 COMMIT_HASH := $(shell git rev-parse --short HEAD)
 OS_INFO := $(shell uname -rmo)
 
-SOURCES := $(wildcard *.c)
+SOURCES := $(wildcard frontend/*.c)
 SOURCES += $(wildcard src/*.c)
 
-bin/main main.c:
+bin/main frontend/main.c:
 	mkdir -p bin
 
 	$(CC) $(SOURCES) -o bin/koalaboard \
 		-DVERSION_TAG="$(VERSION_TAG)" \
 		-DCOMMIT_HASH="$(COMMIT_HASH)" \
 		-DOS_INFO="$(OS_INFO)" \
-		-Isrc -g $(CFLAGS)
+		-Ifrontend -Isrc -I. \
+		$(CFLAGS)
 
 koalaos:
 	$(CROSS_PREFIX)-$(KOS_CC) \

@@ -1,6 +1,5 @@
 #include "libc/stdint.h"
 #include "hw/uart.h"
-#include "sys/tty.h"
 
 #include "c8.h"
 

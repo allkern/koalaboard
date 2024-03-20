@@ -3,6 +3,6 @@
 
 #include "util.h"
 
-SEF_DEFINE(cd, "Change current working directory");
+SEF_DEFINE(cd, "Changes current working directory");
 
 #endif

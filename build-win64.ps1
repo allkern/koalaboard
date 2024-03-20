@@ -12,13 +12,14 @@ mkdir -Force -Path bin > $null
 gcc -I"`"$($KOALABOARD_DIR)`"" `
     -I"`"$($SDL2_DIR)\include`"" `
     -I"`"$($SDL2_DIR)\include\SDL2`"" `
-    "src\*.c" `
-    "*.c" `
+    ".\src\*.c" `
+    ".\frontend\*.c" `
     -o "bin\koalaboard.exe" `
     -DREP_VERSION="`"$($VERSION_TAG)`"" `
     -DREP_COMMIT_HASH="`"$($COMMIT_HASH)`"" `
     -DOS_INFO="`"$($OS_INFO)`"" `
     -L"`"$($SDL2_DIR)\lib`"" `
+    -Ifrontend -Isrc -I. `
     -m64 -lSDL2main -lSDL2 -Wno-overflow `
     -Wall -pedantic -DLOG_USE_COLOR `
     -ffast-math -Ofast -g

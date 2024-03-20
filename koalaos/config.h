@@ -1,3 +1,6 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
 #ifdef _MSC_VER
 #define __COMPILER__ "msvc"
 #elif __GNUC__
@@ -22,3 +25,5 @@
 
 #define STR1(m) #m
 #define STR(m) STR1(m)
+
+#endif

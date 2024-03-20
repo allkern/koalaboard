@@ -14,6 +14,12 @@ void rom_init(rom_t* rom, const char* path) {
 
     FILE* file = fopen(path, "rb");
 
+    if (!file) {
+        printf("Couldn't open ROM file \"%s\"\n", path);
+
+        exit(1);
+    }
+
     fseek(file, 0, SEEK_END);
     rom->size = ftell(file);
     fseek(file, 0, SEEK_SET);
