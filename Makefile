@@ -11,7 +11,7 @@ FW_SOURCES := boot/reset.s
 FW_SOURCES := boot/exception.s
 
 KOS_CC := gcc
-KOS_CFLAGS := -static -nostdlib -EL -fno-tree-loop-distribute-patterns
+KOS_CFLAGS := -static -nostdlib -EL -fno-tree-loop-distribute-patterns -O2
 KOS_CFLAGS += -march=r3000 -mtune=r3000 -mfp32 -ffreestanding -nostdinc
 KOS_SOURCES := $(wildcard koalaos/*.c)
 KOS_SOURCES += $(wildcard koalaos/libc/*.c)

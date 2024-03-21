@@ -254,9 +254,9 @@ _doprnt(
 		    base = 8;
 		    goto print_unsigned;
 
-		case 'd':
+		case 'd': case 'i':
 		    truncate = _doprnt_truncates;
-		case 'D':
+		case 'D': case 'I':
 		    base = 10;
 		    goto print_signed;
 

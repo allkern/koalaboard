@@ -213,6 +213,22 @@ void screen_update(screen_t* screen) {
                         uart_send_byte(screen->uart, '\b');
                     } break;
 
+                    case SDLK_UP: {
+                        uart_send_byte(screen->uart, 0x11);
+                    } break;
+
+                    case SDLK_DOWN: {
+                        uart_send_byte(screen->uart, 0x12);
+                    } break;
+
+                    case SDLK_LEFT: {
+                        uart_send_byte(screen->uart, 0x13);
+                    } break;
+
+                    case SDLK_RIGHT: {
+                        uart_send_byte(screen->uart, 0x14);
+                    } break;
+
                     case SDLK_F1: {
                         screen_toggle_debug_mode(screen);
 

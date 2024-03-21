@@ -107,23 +107,28 @@ exception_handler:
     beq     $t0, $t1, syscall_handler
     nop
 
+    # Anything else, call user handle
+    j       exc_handler
+    nop
+
+unhandled_exception:
     # Unhandled exception (crash kernel)
     la      $t1, unhandled_exception_msg
     jal     kputs
     nop
-    move    $k0, $a0
+    mfc0    $k0, $13
     j       halt
     nop
 
+# To-do: Implement jumptable
 syscall_handler:
     # Initialize IRQ handler
     la      $t0, SYS_IRQ_HANDLER_PTR
     sw      $a0, 0($t0)
 
     # Acknowledge pending IRQs
-    move    $k0, $zero
     la      $k1, 0x9f801070
-    sw      $k0, 0($k1)
+    sw      $zero, 0($k1)
 
     # Enable VBLANK IRQ
     li      $k0, 0x1
@@ -139,19 +144,48 @@ syscall_handler:
 
     # Jump to EPC (+4 to skip syscall instr)
     mfc0    $k0, $14
+    nop
+
+.set noreorder
     addi    $k0, 4
     jr      $k0
     rfe
+.set reorder
 
 irq_handler:
     # Acknowledge pending IRQs
-    move    $k0, $zero
     la      $k1, 0x9f801070
-    sw      $k0, 0($k1)
+    sw      $zero, 0($k1)
 
     # Call registered IRQ handler
-    lui     $t0, 0x8000
+    la      $t0, SYS_KMEM_BASE
     lw      $t0, 0($t0)
+    beqz    $t0, 0f                 # Skip if no handler is registered
+    nop
+    jalr    $t0
+    nop
+
+0:
+    # Restore saved state
+    xrestore
+
+    # Jump to EPC
+    mfc0    $k0, $14
+    nop
+
+.set noreorder
+    jr      $k0
+    rfe
+.set reorder
+
+exc_handler:
+    # Call registered EXC handler
+    la      $t0, SYS_KMEM_BASE
+    lw      $t0, 4($t0)
+
+    # Crash kernel if no handler is registered
+    beqz    $t0, unhandled_exception
+    nop
     jalr    $t0
     nop
 
@@ -160,18 +194,22 @@ irq_handler:
 
     # Jump to EPC
     mfc0    $k0, $14
+    nop
+
+.set noreorder
     jr      $k0
     rfe
+.set reorder
 
 kputs:
-    la      $k0, 0x9f900000
+    la      $t0, 0x9f900000
 
 0:
     lb      $t2, 0($t1)
     beqz    $t2, 1f
-    sb      $t2, 0($k0)
-    addi    $t1, 1
+    sb      $t2, 0($t0)
     b       0b
+    addi    $t1, 1
 
 1:
     jr      $ra
@@ -191,3 +229,5 @@ unhandled_exception_msg:
 
 system_halted_msg:
     .asciiz "kernel: System halted\n"
+
+#include "syscall.s"

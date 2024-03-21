@@ -22,5 +22,6 @@ void free(void* ptr);
 void exit();
 int atexit(void (*func)(void));
 int atoi(const char *s);
+unsigned long strtoul(const char* nptr, char** endptr, int base);
 
 #endif

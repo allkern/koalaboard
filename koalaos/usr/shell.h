@@ -28,7 +28,9 @@ static char* __argv[MAX_ARGS];
 
 #define MAX_CMD 256
 
-static char cmd[MAX_CMD];
+static char prev[MAX_CMD];
+static char curr[MAX_CMD];
+static char* cmd;
 
 void usr_shell_init(void);
 void usr_shell_register(sef_proto fn, const char* name, const char* desc);

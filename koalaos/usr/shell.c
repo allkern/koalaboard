@@ -14,6 +14,8 @@
 #include "print.h"
 #include "chip8.h"
 #include "ver.h"
+#include "dump.h"
+#include "dis.h"
 
 void HACK_malloc_argv() {
     char* base = HACK_MALLOC_BASE;
@@ -33,6 +35,8 @@ void HACK_argv_fix(int argc) {
 void usr_shell_init(void) {
     struct volume_s* vol = volume_get_first();
 
+    cmd = curr;
+
     // <letter>:/
     __envp.cwd[0] = vol->letter;
     __envp.cwd[1] = ':';
@@ -45,6 +49,8 @@ void usr_shell_init(void) {
     SEF_REGISTER(clear);
     SEF_REGISTER(color);
     SEF_REGISTER(dir);
+    SEF_REGISTER(dis);
+    SEF_REGISTER(dump);
     SEF_REGISTER(help);
     SEF_REGISTER(print);
     SEF_REGISTER(test);
@@ -110,6 +116,10 @@ int shell_exec(const char* buf) {
             continue;
 
         size_t len = strlen(sef[i].name);
+        size_t clen = strlen(buf);
+
+        // if (len != clen)
+        //     continue;
 
         if (!strncmp(sef[i].name, buf, len)) {
             HACK_malloc_argv();
@@ -133,6 +143,46 @@ void usr_shell() {
         char c = getchar_block();
 
         switch (c) {
+            // Up arrow
+            case 0x11: {
+                int len = strlen(cmd);
+
+                gpu_set_xpos(gpu_get_xpos() - len * 8);
+
+                while (len--)
+                    gpu_putchar(' ');
+
+                cmd = prev;
+                ptr = cmd + strlen(cmd);
+            } break;
+
+            // Down arrow
+            case 0x12: {
+                int len = strlen(cmd);
+
+                gpu_set_xpos(gpu_get_xpos() - len * 8);
+
+                while (len--)
+                    gpu_putchar(' ');
+
+                cmd = curr;
+                ptr = cmd + strlen(cmd);
+            } break;
+
+            // Escape key (clear command)
+            case 0x1b: {
+                int len = strlen(cmd);
+
+                gpu_set_xpos(gpu_get_xpos() - len * 8);
+
+                while (len--)
+                    gpu_putchar(' ');
+
+                ptr = cmd;
+
+                cmd[0] = '\0';
+            } break;
+
             // Enter key pressed
             case '\r': {
                 if (cmd[0] == '\0') {
@@ -141,11 +191,16 @@ void usr_shell() {
                     goto done;
                 }
 
+                if (cmd != prev)
+                    memcpy(prev, cmd, MAX_CMD);
+
                 putchar('\n');
 
                 *ptr = '\0';
 
                 shell_exec(cmd);
+
+                cmd = curr;
 
                 done:
 

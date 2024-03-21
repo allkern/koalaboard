@@ -20,7 +20,7 @@ void vmc_exit_wrapper(void) {
 uint8_t buf[0x1000];
 
 void fat32_init() {
-    printf("Scanning NVS bus...\n");
+    // printf("Scanning NVS bus...\n");
 
     int i;
 
@@ -33,10 +33,10 @@ void fat32_init() {
             nvs_id* id = (nvs_id*)buf;
 
             if (id->type) {
-                printf("  Mounting drive %u: %s %s... ", i, id->manufacturer, id->model);
+                // printf("  Mounting drive %u: %s %s... ", i, id->manufacturer, id->model);
 
                 if (disk_mount(i)) {
-                    printf("ok\n");
+                    // printf("ok\n");
                 }
             }
         }
@@ -51,25 +51,25 @@ void __start() {
 
     __libc_init_stdio(uart_recv_byte, gpu_putchar);
 
-    printf("Booting KoalaOS...\n");
+    // printf("Booting KoalaOS...\n");
 
-    printf("Initialized stdio\n");
+    // printf("Initialized stdio\n");
 
-    printf("Initializing stdlib... ");
+    // printf("Initializing stdlib... ");
 
     __libc_init_stdlib();
 
-    printf("ok\n");
+    // printf("ok\n");
 
-    printf("Initializing UART hardware... ");
+    // printf("Initializing UART hardware... ");
 
     uart_init();
 
-    printf("ok\n");
+    // printf("ok\n");
 
     fat32_init();
 
-    printf("Calling main...\n");
+    // printf("Calling main...\n");
 
     gpu_clear();
 

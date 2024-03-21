@@ -10,15 +10,17 @@ void irq_handler(void) {
 }
 
 void syscall(uint32_t num) {
+    // Make sure syscall number is in $a0
+    asm volatile (
+        "move $a0, %0\n"
+        : : "r" (num)
+    );
+
     asm("syscall");
 }
 
 int usr_test(int argc, const char* argv[]) {
-    printf("kernel: Installing IRQ handler at %0p... ", irq_handler);
-
-    syscall(irq_handler);
-
-    printf("done\nkernel: Enabling interrupts... ", irq_handler);
+    printf("kernel: Enabling interrupts... ");
 
     asm volatile (
         ".set noat\n"
@@ -27,7 +29,18 @@ int usr_test(int argc, const char* argv[]) {
         ".set at\n"
     );
 
+    printf("done\nkernel: Installing IRQ handler at %08x... ", irq_handler);
+
+    syscall(irq_handler);
+
     puts("done\n");
+
+    asm volatile (
+        ".set noat\n"
+        "la      $at, 0x40ff03\n"
+        "mtc0    $at, $12\n"
+        ".set at\n"
+    );
 
     // Crash system
     // *((int*)0) = 0;
