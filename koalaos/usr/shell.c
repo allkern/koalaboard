@@ -16,6 +16,7 @@
 #include "ver.h"
 #include "dump.h"
 #include "dis.h"
+#include "utime.h"
 
 void HACK_malloc_argv() {
     char* base = HACK_MALLOC_BASE;
@@ -54,6 +55,7 @@ void usr_shell_init(void) {
     SEF_REGISTER(help);
     SEF_REGISTER(print);
     SEF_REGISTER(test);
+    SEF_REGISTER(time);
     SEF_REGISTER(ver);
 
     // Huge hack, we don't use malloc that much anyways

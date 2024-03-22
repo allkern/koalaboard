@@ -9,6 +9,7 @@
 #include "ram.h"
 #include "vmc.h"
 #include "uart.h"
+#include "rtc.h"
 #include "gpu.h"
 #include "dma.h"
 #include "ic.h"
@@ -16,15 +17,18 @@
 #include "rom.h"
 #include "nvram.h"
 
+#ifndef NOGRAPHICS
 #include "screen.h"
+#endif
+
 #include "argparse.h"
 
 /*
     Koalaboard physical memory map:
-    00000000-0000ffff - Firmware RAM (64 KiB)
+    00000000-0000ffff - NVRAM (64 KiB)
     00010000-1f7fffff - Empty
     1f800000-1f801818 - MMIO registers
-    1fc00000-1fc10000 - Firmware ROM (64 KiB)
+    1fc00000-1fc0ffff - Firmware ROM (64 KiB)
     80000000-81000000 - RAM (16 MiB)
 */
 
@@ -32,6 +36,7 @@
 #define NVRAM_PHYS_BASE 0x00000000
 #define VMC_PHYS_BASE   0x1f800000
 #define UART_PHYS_BASE  0x1f900000
+#define RTC_PHYS_BASE   0x1f900010
 #define NVS_PHYS_BASE   0x1fa00000
 #define GPU_PHYS_BASE   0x1f801810
 #define DMA_PHYS_BASE   0x1f801080
@@ -41,6 +46,7 @@
 #define NVRAM_SIZE      0x10000
 #define VMC_SIZE        0x10
 #define UART_SIZE       0x8
+#define RTC_SIZE        0xc
 #define NVS_SIZE        0x40
 #define GPU_SIZE        0x8
 #define DMA_SIZE        0x100
@@ -233,6 +239,16 @@ int main(int argc, const char* argv[]) {
     uart_t* uart = uart_create();
     uart_init(uart, uart_tx_event);
     uart_init_bus_device(uart, uart_bdev);
+
+    bus_device_t* rtc_bdev = bus_register_device(
+        bus,
+        RTC_PHYS_BASE,
+        RTC_PHYS_BASE + RTC_SIZE
+    );
+
+    rtc_t* rtc = rtc_create();
+    rtc_init(rtc);
+    rtc_init_bus_device(rtc, rtc_bdev);
 
     bus_device_t* nvs_bdev = bus_register_device(
         bus,

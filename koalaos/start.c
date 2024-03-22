@@ -49,7 +49,7 @@ void __start() {
     // Basic init
     gpu_init(g_font_vga16, 16);
 
-    __libc_init_stdio(uart_recv_byte, gpu_putchar);
+    __libc_init_stdio(uart_recv_byte, uart_send_byte);
 
     // printf("Booting KoalaOS...\n");
 
