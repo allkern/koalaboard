@@ -25,8 +25,6 @@ void gpu_set_xpos(uint32_t pos);
 void gpu_set_ypos(uint32_t pos);
 void gpu_set_pos(uint32_t pos);
 
-uint32_t gpu_get_pos(void);
-
 static uint32_t g_clut[] = {
     0x63180421, 0x00000000,
     0x00000000, 0x00000000,

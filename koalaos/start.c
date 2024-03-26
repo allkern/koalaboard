@@ -2,7 +2,7 @@
 #include "hw/gpu.h"
 #include "hw/vmc.h"
 #include "hw/nvs.h"
-#include "font/vga16.h"
+#include "font/vga8.h"
 #include "libc/stdio.h"
 #include "libc/stdlib.h"
 #include "sys/fs.h"
@@ -46,30 +46,13 @@ void fat32_init() {
 }
 
 void __start() {
-    // Basic init
-    gpu_init(g_font_vga16, 16);
+    gpu_init(g_font_vga8, 8);
 
-    __libc_init_stdio(uart_recv_byte, uart_send_byte);
-
-    // printf("Booting KoalaOS...\n");
-
-    // printf("Initialized stdio\n");
-
-    // printf("Initializing stdlib... ");
-
+    __libc_init_stdio(uart_recv_byte, gpu_putchar);
     __libc_init_stdlib();
 
-    // printf("ok\n");
-
-    // printf("Initializing UART hardware... ");
-
     uart_init();
-
-    // printf("ok\n");
-
     fat32_init();
-
-    // printf("Calling main...\n");
 
     gpu_clear();
 
