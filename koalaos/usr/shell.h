@@ -3,9 +3,11 @@
 
 #include "libc/stddef.h"
 
+#define MAX_PATH 512
+
 // Shell environment
 static struct sh_envp {
-    char cwd[512];
+    char cwd[MAX_PATH];
 } __envp;
 
 // Shell embedded functions (help, dir, etc.)

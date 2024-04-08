@@ -7,9 +7,16 @@
 int usr_cd(int argc, const char* argv[]) {
     struct ext2_inode inode;
 
-    char path[256];
+    char path[MAX_PATH];
 
-    shell_get_absolute_path(argv[1], path, 256);
+    shell_get_absolute_path(argv[1], path, MAX_PATH);
+
+    int len = strlen(path);
+
+    if (path[len-1] != '/') {
+        path[len] = '/';
+        path[len+1] = '\0';
+    }
 
     if (ext2_search(&inode, path)) {
         printf("Couldn't find path \'%s\'\n", path);
@@ -23,7 +30,7 @@ int usr_cd(int argc, const char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    shell_set_cwd(argv[1]);
+    shell_set_cwd(path);
 
     return EXIT_SUCCESS;
 }

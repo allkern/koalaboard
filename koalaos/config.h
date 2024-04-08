@@ -26,4 +26,14 @@
 #define STR1(m) #m
 #define STR(m) STR1(m)
 
+#define TERM_UART
+
+#ifdef TERM_GPU
+#define TERM_FUNC gpu_putchar
+#elif defined(TERM_UART)
+#define TERM_FUNC uart_send_byte
+#else
+#define TERM_FUNC gpu_putchar
+#endif
+
 #endif

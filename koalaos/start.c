@@ -9,6 +9,7 @@
 #include "usr/dir.h"
 #include "usr/shell.h"
 #include "sys/user.h"
+#include "config.h"
 
 int main(void);
 
@@ -21,7 +22,7 @@ void vmc_exit_wrapper(void) {
 void __start() {
     gpu_init(g_font_vga8, 8);
 
-    __libc_init_stdio(uart_recv_byte, gpu_putchar);
+    __libc_init_stdio(uart_recv_byte, TERM_FUNC);
     __libc_init_stdlib();
 
     // Register vmc_exit call

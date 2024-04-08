@@ -260,7 +260,11 @@ char* shell_get_cwd(void) {
 }
 
 void shell_set_cwd(const char* path) {
-    shell_get_absolute_path(path, __envp.cwd, 512);
+    char buf[512];
+
+    shell_get_absolute_path(path, buf, 512);
+
+    memcpy(__envp.cwd, buf, 512);
 }
 
 struct sef_desc* shell_get_sef_desc(int i) {
@@ -268,8 +272,10 @@ struct sef_desc* shell_get_sef_desc(int i) {
 }
 
 void shell_get_absolute_path(char* path, char* buf, size_t size) {
+    // printf("path=%s, cwd=%s\n", path, __envp.cwd);
+
     if (!path) {
-        strncpy(buf, shell_get_cwd(), size);
+        strncpy(buf, __envp.cwd, size);
 
         return;
     }
@@ -292,5 +298,7 @@ void shell_get_absolute_path(char* path, char* buf, size_t size) {
         rel = home;
     }
 
-    sprintf(buf, (*rel == '/') ? "%s%s" : "%s/%s", rel, path);
+    // printf("rel=%s path=%s (%s%s/)\n", rel, path, rel, path);
+
+    sprintf(buf, "%s%s", rel, path);
 }

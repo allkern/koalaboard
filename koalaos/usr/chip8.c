@@ -43,25 +43,18 @@ int usr_chip8(int argc, const char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    char path[256];
+    char path[MAX_PATH];
 
-    shell_get_absolute_path(argv[1], path, 256);
+    shell_get_absolute_path(argv[1], path, MAX_PATH);
 
-    if (ext2_search(&inode, path)) {
+    struct ext2_fd file;
+
+    if (ext2_fopen(&file, path, "rb")) {
         printf("Couldn't find path \'%s\'\n", path);
 
         return EXIT_FAILURE;
     }
 
-    if ((inode.s_tp & 0xf000) != INODE_FILE) {
-        printf("Path \'%s\' is not a file\n", path);
-
-        return EXIT_FAILURE;
-    }
-
-    struct ext2_fd file;
-
-    ext2_fopen(&file, path, "rb");
     ext2_fread(&file, buf, file.inode.s_sizel);
     ext2_fclose(&file);
 
