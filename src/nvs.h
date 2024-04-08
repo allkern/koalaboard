@@ -7,7 +7,7 @@
 
 #include "bus.h"
 
-#define NVS_SECTOR_SIZE 0x200
+#define NVS_SECTOR_SIZE 1024
 
 enum {
     NVS_REG_DATA = 0x00,

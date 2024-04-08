@@ -2,7 +2,10 @@
 #define UTIL_H
 
 #define SEF_REGISTER(cmd) \
-    usr_shell_register(usr_ ## cmd, USR_NAME_ ## cmd, USR_DESC_ ## cmd)
+    shell_register(usr_ ## cmd, USR_NAME_ ## cmd, USR_DESC_ ## cmd, 0)
+
+#define SEF_ALIAS(cmd, al) \
+    shell_register(usr_ ## cmd, al, "", 1)
 
 #define SEF_DEFINE(cmd, desc) \
     int usr_ ## cmd(int argc, const char* argv[]); \

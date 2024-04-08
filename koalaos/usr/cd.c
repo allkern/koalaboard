@@ -1,82 +1,29 @@
 #include "libc/string.h"
 #include "libc/stdio.h"
-#include "sys/fs.h"
+#include "sys/ext2.h"
 
 #include "shell.h"
 
 int usr_cd(int argc, const char* argv[]) {
-    if (!argv[1])
-        return EXIT_SUCCESS;
+    struct ext2_inode inode;
 
-    if (!strncmp(argv[1], ".", 1))
-        return EXIT_SUCCESS;
+    char path[256];
 
-    const char* path;
+    shell_get_absolute_path(argv[1], path, 256);
 
-    path = argv[1];
-
-    if (!strncmp(argv[1], "..", 2)) {
-        struct dir_s dir;
-
-        fstatus fstat = fat_dir_open(&dir, path, strlen(path));
-
-        if (fstat) {
-            printf("Could not change current directory to \'%s\' (%u)\n",
-                path,
-                fstat
-            );
-
-            return EXIT_FAILURE;
-        }
-
-        fat_dir_close(&dir);
-    }
-
-    char* cwd = shell_get_cwd();
-
-    if (path[1] != ':') {
-        char buf[128];
-
-        char* p = cwd;
-        char* q = buf;
-        char* r = path;
-
-        while (*p != '\0')
-            *q++ = *p++;
-
-        while (*r != '\0')
-            *q++ = *r++;
-
-        *q++ = '/';
-        *q = '\0';
-
-        path = buf;
-    }
-
-    struct dir_s dir;
-    struct info_s info;
-
-    fstatus fstat_open = fat_dir_open(&dir, path, strlen(path));
-    fstatus fstat_read = fat_dir_read(&dir, &info);
-
-    fat_dir_close(&dir);
-
-    printf("attribute=%02x size=%08x\n",
-        info.attribute,
-        info.size
-    );
-
-    if (fstat_open || fstat_read || !(info.attribute & ATTR_DIR)) {
-        printf("Could not change current directory to \'%s\' (%u, %u)\n",
-            path,
-            fstat_open,
-            fstat_read
-        );
+    if (ext2_search(&inode, path)) {
+        printf("Couldn't find path \'%s\'\n", path);
 
         return EXIT_FAILURE;
     }
 
-    strncpy(cwd, path, 512);
+    if ((inode.s_tp & 0xf000) != INODE_DIRECTORY) {
+        printf("Path \'%s\' is not a directory\n");
+
+        return EXIT_FAILURE;
+    }
+
+    shell_set_cwd(argv[1]);
 
     return EXIT_SUCCESS;
 }

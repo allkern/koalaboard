@@ -8,7 +8,8 @@ int usr_help(int argc, const char* argv[]) {
     struct sef_desc* desc = shell_get_sef_desc(index++);
 
     while (desc->name) {
-        printf(" %-8s - %s\n", desc->name, desc->desc);
+        if (!desc->alias)
+            printf(" %-8s - %s\n", desc->name, desc->desc);
 
         desc = shell_get_sef_desc(index++);
     }

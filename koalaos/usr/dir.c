@@ -1,110 +1,108 @@
-#include "sys/fs.h"
+#include "sys/ext2.h"
 #include "usr/shell.h"
 
 #include "libc/string.h"
 #include "libc/stdlib.h"
 #include "libc/stdio.h"
+#include "libc/time.h"
 
-char dechex[] = {
-    '0', '1', '2', '3',
-    '4', '5', '6', '7',
-    '8', '9', 'A', 'B',
-    'C', 'D', 'E', 'F'
-};
+void dir_print(struct ext2_dirent* entry) {
+    if (entry->s_name[0] == '.')
+        return;
 
-int usr_dir(int argc, const char* argv[]) {
-    char* cwd = shell_get_cwd();
+    struct ext2_inode inode;
 
-    const char* path;
+    ext2_get_inode(&inode, entry->s_inode);
 
-    if (!argv[1]) {
-        path = cwd;
-    } else {
-        path = argv[1];
+    time_t t = inode.s_creation_time;
 
-        if (path[1] != ':') {
-            char buf[128];
+    struct tm* tm = gmtime(&t);
 
-            char* p = cwd;
-            char* q = buf;
-            char* r = path;
+    char buf[128];
 
-            while (*p != '\0')
-                *q++ = *p++;
+    strftime(buf, 128, "%b %e %H:%M", tm);
 
-            while (*r != '\0')
-                *q++ = *r++;
+    const char* user = "user";
 
-            *q = '\0';
+    if (inode.s_user_id == 0)
+        user = "root";
 
-            path = buf;
-        }
-
-        // else absolute path
-    }
-
-    current_volume = volume_get_first();
-
-    char serial[10];
-    char* ptr = serial;
-
-    for (int i = 0; i < 8; i++) {
-        if (i == 4)
-            *ptr++ = '-';
-
-        *ptr++ = dechex[(current_volume->serial >> ((7 - i) * 4)) & 0xf];
-    }
-
-    serial[9] = '\0';
-
-    printf(" Volume in drive %c is %s\n",
-        current_volume->letter,
-        current_volume->label
+    printf("%c%c%c%c%c%c%c%c%c%c %s %9u %s ",
+        (entry->s_type == DIRENT_DIRECTORY) ? 'd' : '-',
+        (inode.s_tp & PERM_USER_R) ? 'r' : '-',
+        (inode.s_tp & PERM_USER_W) ? 'w' : '-',
+        (inode.s_tp & PERM_USER_X) ? 'x' : '-',
+        (inode.s_tp & PERM_GROUP_R) ? 'r' : '-',
+        (inode.s_tp & PERM_GROUP_W) ? 'w' : '-',
+        (inode.s_tp & PERM_GROUP_X) ? 'x' : '-',
+        (inode.s_tp & PERM_OTHER_R) ? 'r' : '-',
+        (inode.s_tp & PERM_OTHER_W) ? 'w' : '-',
+        (inode.s_tp & PERM_OTHER_X) ? 'x' : '-',
+        user,
+        inode.s_sizel, buf
     );
 
-    printf(" Volume Serial Number is %s\n", serial);
+    for (int i = 0; i < entry->s_name_len; i++)
+        putchar(entry->s_name[i]);
 
-    printf("\n Directory of %s\n\n", path);
+    if (entry->s_type == DIRENT_DIRECTORY)
+        putchar('/');
 
-    struct dir_s dir;
-    struct info_s info;
+    putchar('\n');
+}
 
-    fstatus fstat_open = fat_dir_open(&dir, path, strlen(path));
-    fstatus fstat_read = fat_dir_read(&dir, &info);
+int usr_dir(int argc, const char* argv[]) {
+    struct ext2_inode inode;
 
-    fat_dir_close(&dir);
+    char path[256];
 
-    // printf("attribute=%02x size=%08x\n",
-    //     info.attribute,
-    //     info.size
-    // );
+    if (!argv[1])
+        argv[1] = shell_get_cwd();
 
-    if (fstat_open || fstat_read) {
-        printf("File not found (%u, %u)\n",
-            fstat_open,
-            fstat_read
+    shell_get_absolute_path(argv[1], path, 256);
+
+    if (ext2_search(&inode, path)) {
+        printf("Couldn't find path \'%s\'\n", path);
+
+        return EXIT_FAILURE;
+    }
+
+    if ((inode.s_tp & 0xf000) != INODE_DIRECTORY) {
+        time_t t = inode.s_creation_time;
+
+        struct tm* tm = gmtime(&t);
+
+        char buf[128];
+
+        strftime(buf, 128, "%b %e %H:%M", tm);
+
+        const char* user = "user";
+
+        if (inode.s_user_id == 0)
+            user = "root";
+
+        printf("%c%c%c%c%c%c%c%c%c%c %s %9u %s %s\n",
+            ((inode.s_tp & 0xf000) == DIRENT_DIRECTORY) ? 'd' : '-',
+            (inode.s_tp & PERM_USER_R) ? 'r' : '-',
+            (inode.s_tp & PERM_USER_W) ? 'w' : '-',
+            (inode.s_tp & PERM_USER_X) ? 'x' : '-',
+            (inode.s_tp & PERM_GROUP_R) ? 'r' : '-',
+            (inode.s_tp & PERM_GROUP_W) ? 'w' : '-',
+            (inode.s_tp & PERM_GROUP_X) ? 'x' : '-',
+            (inode.s_tp & PERM_OTHER_R) ? 'r' : '-',
+            (inode.s_tp & PERM_OTHER_W) ? 'w' : '-',
+            (inode.s_tp & PERM_OTHER_X) ? 'x' : '-',
+            user,
+            inode.s_sizel, buf,
+            path
         );
 
-        return EXIT_FAILURE;
+        return EXIT_SUCCESS;
     }
 
-    if ((!(info.attribute & ATTR_DIR)) && !(info.attribute & ATTR_VOL_LABEL)) {
-        printf("Path \'%s\' does not refer to a directory", path);
+    ext2_dir_iterate(&inode, dir_print);
 
-        return EXIT_FAILURE;
-    }
+    putchar('\n');
 
-    fat_dir_open(&dir, path, strlen(path));
-
-	fstatus status;
-
-	do {
-		status = fat_dir_read(&dir, &info);
-
-		// Print the information
-		if (status == FSTATUS_OK)
-			fat_print_info(&info);
-	} while (status != FSTATUS_EOF);
-
-    fat_dir_close(&dir);
+    return EXIT_SUCCESS;
 }

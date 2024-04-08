@@ -1,60 +1,43 @@
 #include "libc/string.h"
 #include "libc/stdio.h"
-#include "sys/fs.h"
+#include "sys/ext2.h"
 
 #include "shell.h"
 
 int usr_cat(int argc, const char* argv[]) {
-    char* cwd = shell_get_cwd();
+    char buf[EXT2_SECTOR_SIZE];
 
-    const char* path;
+    struct ext2_inode inode;
 
     if (!argv[1]) {
-        printf("Path \'%s\' does not point to a file\n", cwd);
+        printf("No input supplied\n");
 
-        return 1;
-    } else {
-        path = argv[1];
-
-        if (path[1] != ':') {
-            char buf[128];
-
-            char* p = cwd;
-            char* q = buf;
-            char* r = path;
-
-            while (*p != '\0')
-                *q++ = *p++;
-
-            while (*r != '\0')
-                *q++ = *r++;
-
-            *q = '\0';
-
-            path = buf;
-        }
-
-        // else absolute path
+        return EXIT_FAILURE;
     }
 
-    char buf[512];
+    char path[256];
 
-    struct file_s file;
-    uint32_t status;
+    shell_get_absolute_path(argv[1], path, 256);
 
-    if (fat_file_open(&file, path, strlen(path))) {
-        printf("Could not open file \'%s\'\n", path);
+    if (ext2_search(&inode, path)) {
+        printf("Couldn't find path \'%s\'\n", path);
 
-        return 1;
+        return EXIT_FAILURE;
     }
 
-    if (fat_file_read(&file, buf, file.size, &status)) {
-        printf("Could not read file \'%s\'\n", path);
+    if ((inode.s_tp & 0xf000) != INODE_FILE) {
+        printf("Path \'%s\' is not a file\n", path);
 
-        return 1;
+        return EXIT_FAILURE;
     }
 
-    puts(buf);
+    struct ext2_fd file;
+
+    ext2_fopen(&file, path, "rb");
+    ext2_fread(&file, buf, file.inode.s_sizel);
+    ext2_fclose(&file);
+
+    printf("%s\n", buf);
 
     return EXIT_SUCCESS;
 }

@@ -1,6 +1,8 @@
 #ifndef SHELL_H
 #define SHELL_H
 
+#include "libc/stddef.h"
+
 // Shell environment
 static struct sh_envp {
     char cwd[512];
@@ -14,6 +16,7 @@ typedef int (*sef_proto)(int, const char* argv[]);
 static unsigned int sef_index = 0;
 
 static struct sef_desc {
+    int alias;
     const char* name;
     const char* desc;
     sef_proto fn;
@@ -32,13 +35,18 @@ static char prev[MAX_CMD];
 static char curr[MAX_CMD];
 static char* cmd;
 
-void usr_shell_init(void);
-void usr_shell_register(sef_proto fn, const char* name, const char* desc);
-void usr_shell(void);
+void shell_init(void);
+void shell_register(sef_proto fn, const char* name, const char* desc, int alias);
+void shell_start(void);
 int shell_exec(const char* args);
 char* shell_get_cwd(void);
 struct sef_desc* shell_get_sef_desc(int i);
 char* shell_get_path(char* path);
+void shell_exit(void);
+
+char* shell_get_cwd(void);
+void shell_set_cwd(const char* path);
+void shell_get_absolute_path(char* path, char* buf, size_t size);
 
 static char* HACK_MALLOC_BASE;
 

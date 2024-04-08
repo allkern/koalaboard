@@ -5,9 +5,10 @@
 #include "font/vga8.h"
 #include "libc/stdio.h"
 #include "libc/stdlib.h"
-#include "sys/fs.h"
+#include "sys/ext2.h"
 #include "usr/dir.h"
 #include "usr/shell.h"
+#include "sys/user.h"
 
 int main(void);
 
@@ -17,50 +18,27 @@ void vmc_exit_wrapper(void) {
     vmc_exit(main_return_code);
 }
 
-uint8_t buf[0x1000];
-
-void fat32_init() {
-    // printf("Scanning NVS bus...\n");
-
-    int i;
-
-    for (i = 0; i < 4; i++) {
-        int status = nvs_get_status(i);
-
-        if (nvs_get_status(i) & NVS_STAT_PROBE) {
-            nvs_read_ident(i, buf);
-
-            nvs_id* id = (nvs_id*)buf;
-
-            if (id->type) {
-                // printf("  Mounting drive %u: %s %s... ", i, id->manufacturer, id->model);
-
-                if (disk_mount(i)) {
-                    // printf("ok\n");
-                }
-            }
-        }
-    }
-
-    current_volume = volume_get_first();
-}
-
 void __start() {
     gpu_init(g_font_vga8, 8);
 
     __libc_init_stdio(uart_recv_byte, gpu_putchar);
     __libc_init_stdlib();
 
+    // Register vmc_exit call
+    atexit(vmc_exit_wrapper);
+
     uart_init();
-    fat32_init();
+
+    if (ext2_init())
+        exit(EXIT_FAILURE);
+
+    if (user_init())
+        exit(EXIT_FAILURE);
 
     gpu_clear();
 
-    // main call
-    main_return_code = main();
-
-    // Register vmc_exit call
-    atexit(vmc_exit_wrapper);
+    while (1)
+        main();
 
     exit(EXIT_SUCCESS);
 }

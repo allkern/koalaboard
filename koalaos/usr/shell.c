@@ -1,6 +1,7 @@
 #include "libc/string.h"
 #include "libc/stdio.h"
-#include "sys/fs.h"
+#include "sys/ext2.h"
+#include "sys/user.h"
 #include "hw/gpu.h"
 
 #include "shell.h"
@@ -11,12 +12,16 @@
 #include "cat.h"
 #include "color.h"
 #include "clear.h"
+#include "exit.h"
 #include "print.h"
 #include "chip8.h"
 #include "ver.h"
 #include "dump.h"
 #include "dis.h"
 #include "utime.h"
+#include "whoami.h"
+
+static int __exit = 0;
 
 void HACK_malloc_argv() {
     char* base = HACK_MALLOC_BASE;
@@ -33,16 +38,16 @@ void HACK_argv_fix(int argc) {
         __argv[i] = NULL;
 }
 
-void usr_shell_init(void) {
-    struct volume_s* vol = volume_get_first();
-
+void shell_init(void) {
     cmd = curr;
 
-    // <letter>:/
-    __envp.cwd[0] = vol->letter;
-    __envp.cwd[1] = ':';
-    __envp.cwd[2] = '/';
-    __envp.cwd[3] = '\0';
+    __exit = 0;
+
+    // "/"
+    __envp.cwd[0] = '/';
+    __envp.cwd[1] = '\0';
+
+    sef_index = 0;
 
     SEF_REGISTER(cat);
     SEF_REGISTER(cd);
@@ -52,20 +57,29 @@ void usr_shell_init(void) {
     SEF_REGISTER(dir);
     SEF_REGISTER(dis);
     SEF_REGISTER(dump);
+    SEF_REGISTER(exit);
     SEF_REGISTER(help);
     SEF_REGISTER(print);
     SEF_REGISTER(test);
     SEF_REGISTER(time);
     SEF_REGISTER(ver);
+    SEF_REGISTER(whoami);
+    SEF_ALIAS(dir, "ls");
+    SEF_ALIAS(dir, "l");
+    SEF_ALIAS(dis, "d/i");
+    SEF_ALIAS(dump, "d/m");
 
     // Huge hack, we don't use malloc that much anyways
-    HACK_MALLOC_BASE = malloc(0);
+    if (!HACK_MALLOC_BASE) {
+        HACK_MALLOC_BASE = malloc(0);
 
-    // Allocate two contiguous blocks
-    void* dummy = malloc(0);
+        // Allocate two contiguous blocks
+        (void)malloc(0);
+    }
 }
 
-void usr_shell_register(sef_proto fn, const char* name, const char* desc) {
+void shell_register(sef_proto fn, const char* name, const char* desc, int alias) {
+    sef[sef_index].alias = alias;
     sef[sef_index].fn = fn;
     sef[sef_index].name = name;
     sef[sef_index++].desc = desc;
@@ -110,6 +124,10 @@ void init_argv(char* buf) {
     }
 }
 
+void shell_exit(void) {
+    __exit = 1;
+}
+
 int shell_exec(const char* buf) {
     __argc = 0;
 
@@ -122,7 +140,7 @@ int shell_exec(const char* buf) {
 
         // if (len != clen)
         //     continue;
-
+ 
         if (!strncmp(sef[i].name, buf, len)) {
             HACK_malloc_argv();
             init_argv(buf);
@@ -136,11 +154,17 @@ int shell_exec(const char* buf) {
     printf("Unknown command \'%s\'\n", buf);
 }
 
-void usr_shell() {
+void shell_start() {
     char* ptr = cmd;
 
-    while (1) {
-        printf("\r%s> %s", __envp.cwd, cmd);
+    while (!__exit) {
+        printf("\r%s@%s:%s%c %s",
+            user_get_name(),
+            "koala",
+            __envp.cwd,
+            user_is_root() ? '#' : '$',
+            cmd
+        );
 
         char c = getchar_block();
 
@@ -228,13 +252,15 @@ void usr_shell() {
         }
     }
 
-    printf("Exit shell\n");
-
-    while(1);
+    printf("exit\n");
 }
 
 char* shell_get_cwd(void) {
     return __envp.cwd;
+}
+
+void shell_set_cwd(const char* path) {
+    shell_get_absolute_path(path, __envp.cwd, 512);
 }
 
 struct sef_desc* shell_get_sef_desc(int i) {
@@ -242,27 +268,29 @@ struct sef_desc* shell_get_sef_desc(int i) {
 }
 
 void shell_get_absolute_path(char* path, char* buf, size_t size) {
-    char* cwd = __envp.cwd;
+    if (!path) {
+        strncpy(buf, shell_get_cwd(), size);
 
-    const char* abs = path;
-    
-    if (path[1] != ':') {
-        char buf[128];
-
-        char* p = cwd;
-        char* q = buf;
-        char* r = path;
-
-        while (*p != '\0')
-            *q++ = *p++;
-
-        while (*r != '\0')
-            *q++ = *r++;
-
-        *q = '\0';
-
-        abs = buf;
+        return;
     }
 
-    strncpy(abs, buf, size);
+    char home[128];
+
+    // Path is already absolute
+    if (*path == '/') {
+        strncpy(buf, path, size);
+
+        return;
+    }
+
+    char* rel = __envp.cwd;
+
+    if (*path == '~') {
+        user_get_home_path(home);
+
+        ++path;
+        rel = home;
+    }
+
+    sprintf(buf, (*rel == '/') ? "%s%s" : "%s/%s", rel, path);
 }
