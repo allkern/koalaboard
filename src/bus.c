@@ -53,7 +53,7 @@ bus_device_t* search_device(bus_t* bus, uint32_t addr) {
             return dev;
     }
 
-    return (bus_device_t*)0;
+    return NULL;
 }
 
 void bus_destroy(bus_t* bus) {

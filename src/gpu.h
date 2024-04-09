@@ -148,6 +148,7 @@ struct psx_gpu_t {
     // Timing and IRQs
     float cycles;
     int line;
+    int cpu_freq;
 
     psx_ic_t* ic;
 
@@ -167,6 +168,7 @@ void psx_gpu_set_udata(psx_gpu_t*, int, void*);
 void psx_gpu_set_event_callback(psx_gpu_t*, int, psx_gpu_event_callback_t);
 void* psx_gpu_get_display_buffer(psx_gpu_t*);
 void psx_gpu_update(psx_gpu_t*, int);
+void psx_gpu_set_cpu_freq(psx_gpu_t*, int);
 
 // Bus adapter
 uint32_t bus_gpu_read32(uint32_t, void*);

@@ -1,26 +1,20 @@
 /**
  * @file cpu.h
  * @brief MIPS R3000 emulator (with cache and MMU)
- * 
  */
 
-#ifndef CPU_H
-#define CPU_H
+#ifndef R3000A_H
+#define R3000A_H
 
 #include <stdint.h>
 #include <stdio.h>
 
-// #define R3000_CPS 33868800 // 33868800 Clocks/s
-// #define R3000_FREQ 33.868800f // 33.868800 MHz
+#define R3000A_CPS 10000000 // 100000000 Clocks/s
+#define R3000A_FREQ 10.000000f // 100.000000 MHz
 
-#define R3000_CPS 30_000000 // 100000000 Clocks/s
-#define R3000_FREQ 30.000000f // 100.000000 MHz
+struct r3000_state;
 
-struct r3000_t;
-
-typedef struct r3000_t r3000_t;
-
-typedef void (*r3000_kcall_hook_t)(r3000_t*);
+typedef struct r3000_state r3000_state;
 
 /*
     cop0r0      - Index
@@ -76,26 +70,26 @@ typedef void (*r3000_kcall_hook_t)(r3000_t*);
   -          hi,lo    Multiply/divide results, may be changed by subroutines
 */
 
-typedef uint32_t (*r3000_bus_read32_t)(uint32_t addr, void* udata);
-typedef uint32_t (*r3000_bus_read16_t)(uint32_t addr, void* udata);
-typedef uint32_t (*r3000_bus_read8_t)(uint32_t addr, void* udata);
-typedef void (*r3000_bus_write32_t)(uint32_t addr, uint32_t data, void* udata);
-typedef void (*r3000_bus_write16_t)(uint32_t addr, uint32_t data, void* udata);
-typedef void (*r3000_bus_write8_t)(uint32_t addr, uint32_t data, void* udata);
-typedef int (*r3000_bus_query_access_cycles_t)(void* udata);
+typedef uint32_t (*r3000_bus_read32)(uint32_t addr, void* udata);
+typedef uint32_t (*r3000_bus_read16)(uint32_t addr, void* udata);
+typedef uint32_t (*r3000_bus_read8)(uint32_t addr, void* udata);
+typedef void (*r3000_bus_write32)(uint32_t addr, uint32_t data, void* udata);
+typedef void (*r3000_bus_write16)(uint32_t addr, uint32_t data, void* udata);
+typedef void (*r3000_bus_write8)(uint32_t addr, uint32_t data, void* udata);
+typedef int (*r3000_bus_query_access_cycles)(void* udata);
 
 typedef struct {
-    r3000_bus_read32_t read32;
-    r3000_bus_read16_t read16;
-    r3000_bus_read8_t read8;
-    r3000_bus_write32_t write32;
-    r3000_bus_write16_t write16;
-    r3000_bus_write8_t write8;
-    r3000_bus_query_access_cycles_t query_access_cycles;
+    r3000_bus_read32 read32;
+    r3000_bus_read16 read16;
+    r3000_bus_read8 read8;
+    r3000_bus_write32 write32;
+    r3000_bus_write16 write16;
+    r3000_bus_write8 write8;
+    r3000_bus_query_access_cycles query_access_cycles;
     void* udata;
-} r3000_bus_t;
+} r3000_bus;
 
-struct __attribute__((__packed__)) r3000_t {
+struct __attribute__((__packed__)) r3000_state {
     uint32_t r[32];
     uint32_t opcode;
     uint32_t pc, next_pc, saved_pc;
@@ -103,15 +97,15 @@ struct __attribute__((__packed__)) r3000_t {
     uint32_t load_d, load_v;
     uint32_t last_cycles;
     uint32_t total_cycles;
-    int branch, delay_slot, branch_taken;
-    
-    r3000_bus_read32_t bus_read32;
-    r3000_bus_read16_t bus_read16;
-    r3000_bus_read8_t bus_read8;
-    r3000_bus_write32_t bus_write32;
-    r3000_bus_write16_t bus_write16;
-    r3000_bus_write8_t bus_write8;
-    r3000_bus_query_access_cycles_t bus_query_access_cycles;
+    int branch, delay_slot, branch_taken, mmu_exception;
+
+    r3000_bus_read32 bus_read32;
+    r3000_bus_read16 bus_read16;
+    r3000_bus_read8 bus_read8;
+    r3000_bus_write32 bus_write32;
+    r3000_bus_write16 bus_write16;
+    r3000_bus_write8 bus_write8;
+    r3000_bus_query_access_cycles bus_query_access_cycles;
     void* bus_udata;
 
     struct {
@@ -190,20 +184,20 @@ struct __attribute__((__packed__)) r3000_t {
 #define SR_CU2 0x40000000
 #define SR_CU3 0x80000000
 
-r3000_t* r3000_create();
-void r3000_init(r3000_t*, r3000_bus_t*);
-void r3000_destroy(r3000_t*);
-void r3000_cycle(r3000_t*);
-void r3000_exception(r3000_t*, uint32_t);
-void r3000_set_irq_pending(r3000_t*);
-uint32_t r3000_read32(r3000_t*, uint32_t);
-uint32_t r3000_read16(r3000_t*, uint32_t);
-uint32_t r3000_read8(r3000_t*, uint32_t);
-void r3000_write32(r3000_t*, uint32_t, uint32_t);
-void r3000_write16(r3000_t*, uint32_t, uint32_t);
-void r3000_write8(r3000_t*, uint32_t, uint32_t);
-int r3000_check_irq(r3000_t*);
-void r3000_set_pc(r3000_t*, uint32_t);
+r3000_state* r3000_create();
+void r3000_init(r3000_state*, r3000_bus*);
+void r3000_destroy(r3000_state*);
+void r3000_cycle(r3000_state*);
+void r3000_exception(r3000_state*, uint32_t);
+void r3000_set_irq_pending(r3000_state*);
+uint32_t r3000_read32(r3000_state*, uint32_t);
+uint32_t r3000_read16(r3000_state*, uint32_t);
+uint32_t r3000_read8(r3000_state*, uint32_t);
+void r3000_write32(r3000_state*, uint32_t, uint32_t);
+void r3000_write16(r3000_state*, uint32_t, uint32_t);
+void r3000_write8(r3000_state*, uint32_t, uint32_t);
+int r3000_check_irq(r3000_state*);
+void r3000_set_pc(r3000_state*, uint32_t);
 
 /*
     00h INT     Interrupt
@@ -248,102 +242,102 @@ void r3000_set_pc(r3000_t*, uint32_t);
 #define MMU_ENOENT  0xffffffff
 #define MMU_SIGSEGV 0xffffffff
 
-void r3000_i_invalid(r3000_t*);
+void r3000_i_invalid(r3000_state*);
 
 // Primary
-void r3000_i_special(r3000_t*);
-void r3000_i_bxx(r3000_t*);
-void r3000_i_j(r3000_t*);
-void r3000_i_jal(r3000_t*);
-void r3000_i_beq(r3000_t*);
-void r3000_i_bne(r3000_t*);
-void r3000_i_blez(r3000_t*);
-void r3000_i_bgtz(r3000_t*);
-void r3000_i_addi(r3000_t*);
-void r3000_i_addiu(r3000_t*);
-void r3000_i_slti(r3000_t*);
-void r3000_i_sltiu(r3000_t*);
-void r3000_i_andi(r3000_t*);
-void r3000_i_ori(r3000_t*);
-void r3000_i_xori(r3000_t*);
-void r3000_i_lui(r3000_t*);
-void r3000_i_cop0(r3000_t*);
-void r3000_i_cop1(r3000_t*);
-void r3000_i_cop2(r3000_t*);
-void r3000_i_cop3(r3000_t*);
-void r3000_i_lb(r3000_t*);
-void r3000_i_lh(r3000_t*);
-void r3000_i_lwl(r3000_t*);
-void r3000_i_lw(r3000_t*);
-void r3000_i_lbu(r3000_t*);
-void r3000_i_lhu(r3000_t*);
-void r3000_i_lwr(r3000_t*);
-void r3000_i_sb(r3000_t*);
-void r3000_i_sh(r3000_t*);
-void r3000_i_swl(r3000_t*);
-void r3000_i_sw(r3000_t*);
-void r3000_i_swr(r3000_t*);
-void r3000_i_lwc0(r3000_t*);
-void r3000_i_lwc1(r3000_t*);
-void r3000_i_lwc2(r3000_t*);
-void r3000_i_lwc3(r3000_t*);
-void r3000_i_swc0(r3000_t*);
-void r3000_i_swc1(r3000_t*);
-void r3000_i_swc2(r3000_t*);
-void r3000_i_swc3(r3000_t*);
+void r3000_i_special(r3000_state*);
+void r3000_i_bxx(r3000_state*);
+void r3000_i_j(r3000_state*);
+void r3000_i_jal(r3000_state*);
+void r3000_i_beq(r3000_state*);
+void r3000_i_bne(r3000_state*);
+void r3000_i_blez(r3000_state*);
+void r3000_i_bgtz(r3000_state*);
+void r3000_i_addi(r3000_state*);
+void r3000_i_addiu(r3000_state*);
+void r3000_i_slti(r3000_state*);
+void r3000_i_sltiu(r3000_state*);
+void r3000_i_andi(r3000_state*);
+void r3000_i_ori(r3000_state*);
+void r3000_i_xori(r3000_state*);
+void r3000_i_lui(r3000_state*);
+void r3000_i_cop0(r3000_state*);
+void r3000_i_cop1(r3000_state*);
+void r3000_i_cop2(r3000_state*);
+void r3000_i_cop3(r3000_state*);
+void r3000_i_lb(r3000_state*);
+void r3000_i_lh(r3000_state*);
+void r3000_i_lwl(r3000_state*);
+void r3000_i_lw(r3000_state*);
+void r3000_i_lbu(r3000_state*);
+void r3000_i_lhu(r3000_state*);
+void r3000_i_lwr(r3000_state*);
+void r3000_i_sb(r3000_state*);
+void r3000_i_sh(r3000_state*);
+void r3000_i_swl(r3000_state*);
+void r3000_i_sw(r3000_state*);
+void r3000_i_swr(r3000_state*);
+void r3000_i_lwc0(r3000_state*);
+void r3000_i_lwc1(r3000_state*);
+void r3000_i_lwc2(r3000_state*);
+void r3000_i_lwc3(r3000_state*);
+void r3000_i_swc0(r3000_state*);
+void r3000_i_swc1(r3000_state*);
+void r3000_i_swc2(r3000_state*);
+void r3000_i_swc3(r3000_state*);
 
 // Secondary
-void r3000_i_sll(r3000_t*);
-void r3000_i_srl(r3000_t*);
-void r3000_i_sra(r3000_t*);
-void r3000_i_sllv(r3000_t*);
-void r3000_i_srlv(r3000_t*);
-void r3000_i_srav(r3000_t*);
-void r3000_i_jr(r3000_t*);
-void r3000_i_jalr(r3000_t*);
-void r3000_i_syscall(r3000_t*);
-void r3000_i_break(r3000_t*);
-void r3000_i_mfhi(r3000_t*);
-void r3000_i_mthi(r3000_t*);
-void r3000_i_mflo(r3000_t*);
-void r3000_i_mtlo(r3000_t*);
-void r3000_i_mult(r3000_t*);
-void r3000_i_multu(r3000_t*);
-void r3000_i_div(r3000_t*);
-void r3000_i_divu(r3000_t*);
-void r3000_i_add(r3000_t*);
-void r3000_i_addu(r3000_t*);
-void r3000_i_sub(r3000_t*);
-void r3000_i_subu(r3000_t*);
-void r3000_i_and(r3000_t*);
-void r3000_i_or(r3000_t*);
-void r3000_i_xor(r3000_t*);
-void r3000_i_nor(r3000_t*);
-void r3000_i_slt(r3000_t*);
-void r3000_i_sltu(r3000_t*);
+void r3000_i_sll(r3000_state*);
+void r3000_i_srl(r3000_state*);
+void r3000_i_sra(r3000_state*);
+void r3000_i_sllv(r3000_state*);
+void r3000_i_srlv(r3000_state*);
+void r3000_i_srav(r3000_state*);
+void r3000_i_jr(r3000_state*);
+void r3000_i_jalr(r3000_state*);
+void r3000_i_syscall(r3000_state*);
+void r3000_i_break(r3000_state*);
+void r3000_i_mfhi(r3000_state*);
+void r3000_i_mthi(r3000_state*);
+void r3000_i_mflo(r3000_state*);
+void r3000_i_mtlo(r3000_state*);
+void r3000_i_mult(r3000_state*);
+void r3000_i_multu(r3000_state*);
+void r3000_i_div(r3000_state*);
+void r3000_i_divu(r3000_state*);
+void r3000_i_add(r3000_state*);
+void r3000_i_addu(r3000_state*);
+void r3000_i_sub(r3000_state*);
+void r3000_i_subu(r3000_state*);
+void r3000_i_and(r3000_state*);
+void r3000_i_or(r3000_state*);
+void r3000_i_xor(r3000_state*);
+void r3000_i_nor(r3000_state*);
+void r3000_i_slt(r3000_state*);
+void r3000_i_sltu(r3000_state*);
 
 // BXX
-void r3000_i_bltz(r3000_t*);
-void r3000_i_bgez(r3000_t*);
-void r3000_i_bltzal(r3000_t*);
-void r3000_i_bgezal(r3000_t*);
+void r3000_i_bltz(r3000_state*);
+void r3000_i_bgez(r3000_state*);
+void r3000_i_bltzal(r3000_state*);
+void r3000_i_bgezal(r3000_state*);
 
 // COP0
-void r3000_i_mfc0(r3000_t*);
-void r3000_i_mtc0(r3000_t*);
-void r3000_i_rfe(r3000_t*);
-void r3000_i_tlbp(r3000_t*);
-void r3000_i_tlbr(r3000_t*);
-void r3000_i_tlbwi(r3000_t*);
-void r3000_i_tlbwr(r3000_t*);
+void r3000_i_mfc0(r3000_state*);
+void r3000_i_mtc0(r3000_state*);
+void r3000_i_rfe(r3000_state*);
+void r3000_i_tlbp(r3000_state*);
+void r3000_i_tlbr(r3000_state*);
+void r3000_i_tlbwi(r3000_state*);
+void r3000_i_tlbwr(r3000_state*);
 
 // COP1
-void r3000_i_mfc1(r3000_t*);
-void r3000_i_cfc1(r3000_t*);
-void r3000_i_mtc1(r3000_t*);
-void r3000_i_ctc1(r3000_t*);
-void r3000_i_fpu(r3000_t*);
+void r3000_i_mfc1(r3000_state*);
+void r3000_i_cfc1(r3000_state*);
+void r3000_i_mtc1(r3000_state*);
+void r3000_i_ctc1(r3000_state*);
+void r3000_i_fpu(r3000_state*);
 
-typedef void (*r3000_instruction_t)(r3000_t*);
+typedef void (*r3000_instruction)(r3000_state*);
 
 #endif

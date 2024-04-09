@@ -9,7 +9,7 @@ psx_ic_t* psx_ic_create() {
     return (psx_ic_t*)malloc(sizeof(psx_ic_t));
 }
 
-void psx_ic_init(psx_ic_t* ic, r3000_t* cpu) {
+void psx_ic_init(psx_ic_t* ic, r3000_state* cpu) {
     memset(ic, 0, sizeof(psx_ic_t));
 
     ic->io_base = PSX_IC_BEGIN;

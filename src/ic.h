@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "cpu.h"
+#include "r3000.h"
 
 #define PSX_IC_BEGIN 0x1f801070
 #define PSX_IC_SIZE  0x8
@@ -50,11 +50,11 @@ typedef struct {
     uint16_t stat;
     uint16_t mask;
 
-    r3000_t* cpu;
+    r3000_state* cpu;
 } psx_ic_t;
 
 psx_ic_t* psx_ic_create();
-void psx_ic_init(psx_ic_t*, r3000_t*);
+void psx_ic_init(psx_ic_t*, r3000_state*);
 uint32_t psx_ic_read32(psx_ic_t*, uint32_t);
 uint16_t psx_ic_read16(psx_ic_t*, uint32_t);
 uint8_t psx_ic_read8(psx_ic_t*, uint32_t);

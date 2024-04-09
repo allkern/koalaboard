@@ -4,7 +4,7 @@
 #include <math.h>
 
 #include "elf_ldr.h"
-#include "cpu.h"
+#include "r3000.h"
 #include "bus.h"
 #include "ram.h"
 #include "vmc.h"
@@ -32,8 +32,8 @@
     80000000-81000000 - RAM (16 MiB)
 */
 
-#define RAM_PHYS_BASE   0x80000000
-#define NVRAM_PHYS_BASE 0x00000000
+#define RAM_PHYS_BASE   0x00000000
+#define NVRAM_PHYS_BASE 0x10000000
 #define VMC_PHYS_BASE   0x1f800000
 #define UART_PHYS_BASE  0x1f900000
 #define RTC_PHYS_BASE   0x1f900010
@@ -188,7 +188,7 @@ int main(int argc, const char* argv[]) {
         return 0;
     }
 
-    r3000_bus_t cpu_bus = {
+    r3000_bus cpu_bus = {
         .query_access_cycles = bus_query_access_cycles,
         .read32 = bus_read32,
         .read16 = bus_read16,
@@ -199,17 +199,8 @@ int main(int argc, const char* argv[]) {
         .udata = bus
     };
 
-    r3000_t* cpu = r3000_create();
+    r3000_state* cpu = r3000_create();
     r3000_init(cpu, &cpu_bus);
-
-    bus_device_t* nvram_bdev = bus_register_device(bus,
-        NVRAM_PHYS_BASE,
-        NVRAM_PHYS_BASE + NVRAM_SIZE
-    );
-
-    nvram_t* nvram = nvram_create();
-    nvram_init(nvram, NVRAM_SIZE, nvram_path);
-    nvram_init_bus_device(nvram, nvram_bdev);
 
     bus_device_t* ram_bdev = bus_register_device(bus,
         RAM_PHYS_BASE,
@@ -219,6 +210,15 @@ int main(int argc, const char* argv[]) {
     ram_t* ram = ram_create();
     ram_init(ram, RAM_SIZE);
     ram_init_bus_device(ram, ram_bdev);
+
+    bus_device_t* nvram_bdev = bus_register_device(bus,
+        NVRAM_PHYS_BASE,
+        NVRAM_PHYS_BASE + NVRAM_SIZE
+    );
+
+    nvram_t* nvram = nvram_create();
+    nvram_init(nvram, NVRAM_SIZE, nvram_path);
+    nvram_init_bus_device(nvram, nvram_bdev);
 
     bus_device_t* vmc_bdev = bus_register_device(
         bus,
@@ -299,6 +299,7 @@ int main(int argc, const char* argv[]) {
 
     psx_gpu_t* gpu = psx_gpu_create();
     psx_gpu_init(gpu, ic);
+    psx_gpu_set_cpu_freq(gpu, R3000A_FREQ);
     psx_gpu_set_event_callback(gpu, GPU_EVENT_DMODE, gpu_dmode_event_cb);
     psx_gpu_set_event_callback(gpu, GPU_EVENT_VBLANK, gpu_vblank_event_cb);
     psx_gpu_set_udata(gpu, 0, screen);
@@ -367,42 +368,64 @@ int main(int argc, const char* argv[]) {
         free(pt_name);
 
         if (elf->phdr[i]->p_type == PT_LOAD) {
-            int segments = (phdr->p_memsz >> 12) + ((phdr->p_memsz & 0xfff) ? 1 : 0) + 1;
+            // int segments = (phdr->p_memsz >> 12) + ((phdr->p_memsz & 0xfff) ? 1 : 0) + 1;
 
-            printf("%u segments required\n", segments);
+            // printf("%u segments required\n", segments);
 
             uint32_t vaddr = phdr->p_vaddr;
             uint32_t paddr = phdr->p_paddr;
 
             elf_load_segment(elf, i, &ram->buf[paddr]);
 
-            for (int s = 0; s < segments; s++) {
-                cpu->tlb[seg].hi = vaddr & 0xfffff000;
-                cpu->tlb[seg].lo = ((paddr + RAM_PHYS_BASE) & 0xfffff000) | TLBE_G | TLBE_V | TLBE_D;
+            // for (int s = 0; s < segments; s++) {
+            //     cpu->tlb[seg].hi = vaddr & 0xfffff000;
+            //     cpu->tlb[seg].lo = ((paddr + RAM_PHYS_BASE) & 0xfffff000) | TLBE_G | TLBE_V | TLBE_D;
 
-                printf("Loading TLB index %u v 0x%08x -> p 0x%08x segment @ 0x%08x\n",
-                    seg,
-                    cpu->tlb[seg].hi,
-                    cpu->tlb[seg].lo,
-                    paddr
-                );
+            //     printf("Loading TLB index %u v 0x%08x -> p 0x%08x segment @ 0x%08x\n",
+            //         seg,
+            //         cpu->tlb[seg].hi,
+            //         cpu->tlb[seg].lo,
+            //         paddr
+            //     );
 
-                paddr += 0x1000;
-                vaddr += 0x1000;
-                ++seg;
-            }
+            //     paddr += 0x1000;
+            //     vaddr += 0x1000;
+            //     ++seg;
+            // }
 
-            offset += phdr->p_align;
+            // offset += phdr->p_align;
         }
     }
 
     // Allocate 4 KiB of stack space
-    printf("Allocating stack space...\n");
+    // printf("Allocating stack space...\n");
+    // cpu->tlb[63].hi = 0x00fff000;
+    // cpu->tlb[63].lo = 0x00fff000 | TLBE_G | TLBE_V | TLBE_D;
 
-    cpu->tlb[63].hi = 0x00fff000;
-    cpu->tlb[63].lo = 0x80fff000 | TLBE_G | TLBE_V | TLBE_D;
+    printf("Initializing stack... ");
     cpu->r[29] = 0x01000000;
     cpu->r[30] = cpu->r[29];
+
+    printf("0x%08x\n", cpu->r[29]);
+
+    printf("Initializing pagetable... ");
+
+    int total_pages = RAM_SIZE / 0x1000;
+
+    printf("%d pages, %d KiB\n", total_pages, (total_pages * 8) / 1024);
+
+    uint32_t* ptr = nvram->buf;
+
+    for (int i = 0; i < total_pages; i++) {
+        ptr[(i<<1)] = i << 12;
+        ptr[(i<<1)+1] = (RAM_PHYS_BASE + (i << 12)) | TLBE_G | TLBE_V | TLBE_D;
+    }
+
+    printf("Initializing kernel variables...\n");
+    
+    // To-do: Set to first free page after OS executable
+    // SYS_HEAP_BASE_PAGE: 0x90008008
+    // *(uint32_t*)&nvram->buf[0x8008] = 0x00000000;
 
     printf("Setting PC to entry address %08x\n", elf->ehdr->e_entry);
 

@@ -2,11 +2,12 @@
 
 .org 0x00000180
 
-.equ SYS_KMEM_BASE, 0x80000000
-.equ SYS_KMEM_END, 0x80010000
-.equ SYS_IRQ_HANDLER_PTR, 0x80000000
-.equ SYS_EXC_HANDLER_PTR, 0x80000004
-.equ SYS_XCONTEXT_BASE, 0x80001000
+.equ SYS_KMEM_BASE,         0x90000000
+.equ SYS_KMEM_END,          0x90010000
+.equ SYS_IRQ_HANDLER_PTR,   0x90008000
+.equ SYS_EXC_HANDLER_PTR,   0x90008004
+.equ SYS_HEAP_BASE_PAGE,    0x90008008 # End of OS executable
+.equ SYS_XCONTEXT_BASE,     0x90009000
 
 .macro xsave
 .set noat
@@ -179,15 +180,34 @@ irq_handler:
 .set reorder
 
 exc_handler:
-    # Call registered EXC handler
-    la      $t0, SYS_KMEM_BASE
-    lw      $t0, 4($t0)
+    # Assume TLB refill needed
+    # Get unmapped address from BadVaddr
+    mfc0    $k0, $8
 
-    # Crash kernel if no handler is registered
-    beqz    $t0, unhandled_exception
-    nop
-    jalr    $t0
-    nop
+    # Get pointer to pagetable entry
+    srl     $k0, 9
+    andi    $k0, 0xfff8
+    lui     $k1, 0x9000
+    or      $k0, $k0, $k1
+
+    # Load mapping from kernel memory
+    lw      $k1, 4($k0)
+    mtc0    $k1, $2
+    lw      $k1, 0($k0)
+    mtc0    $k1, $10
+
+    # Write mapping to TLB (random entry)
+    tlbwr
+
+    # # Call registered EXC handler
+    # la      $t0, SYS_KMEM_BASE
+    # lw      $t0, 4($t0)
+
+    # # Crash kernel if no handler is registered
+    # beqz    $t0, unhandled_exception
+    # nop
+    # jalr    $t0
+    # nop
 
     # Restore saved state
     xrestore

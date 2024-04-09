@@ -1,15 +1,22 @@
+#include "config.h"
 #include "hw/uart.h"
 #include "hw/gpu.h"
 #include "hw/vmc.h"
 #include "hw/nvs.h"
-#include "font/vga8.h"
 #include "libc/stdio.h"
 #include "libc/stdlib.h"
 #include "sys/ext2.h"
 #include "usr/dir.h"
 #include "usr/shell.h"
 #include "sys/user.h"
-#include "config.h"
+
+#ifdef GPU_FONT8
+#include "font/vga8.h"
+#elif defined(GPU_FONT16)
+#include "font/vga16.h"
+#else
+#include "font/vga8.h"
+#endif
 
 int main(void);
 
@@ -20,7 +27,7 @@ void vmc_exit_wrapper(void) {
 }
 
 void __start() {
-    gpu_init(g_font_vga8, 8);
+    gpu_init(GPU_FONT, GPU_FONT_SIZE);
 
     __libc_init_stdio(uart_recv_byte, TERM_FUNC);
     __libc_init_stdlib();

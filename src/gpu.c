@@ -1697,6 +1697,10 @@ void psx_gpu_set_udata(psx_gpu_t* gpu, int index, void* udata) {
     gpu->udata[index] = udata;
 }
 
+void psx_gpu_set_cpu_freq(psx_gpu_t* gpu, int freq) {
+    gpu->cpu_freq = freq;
+}
+
 #define GPU_CYCLES_PER_HDRAW_NTSC 2560.0f
 #define GPU_CYCLES_PER_SCANL_NTSC 3413.0f
 #define GPU_SCANS_PER_VDRAW_NTSC 240
@@ -1737,7 +1741,7 @@ void psx_gpu_update(psx_gpu_t* gpu, int cyc) {
                       (gpu->cycles <= GPU_CYCLES_PER_SCANL_NTSC);
 
     // Convert CPU (~33.8 MHz) cycles to GPU (~53.7 MHz) cycles
-    gpu->cycles += (float)cyc * (PSX_GPU_FREQ_NTSC / R3000_FREQ);
+    gpu->cycles += (float)cyc * (PSX_GPU_FREQ_NTSC / gpu->cpu_freq);
     // gpu->cycles += (float)cyc * (11.0f / 7.0f);
 
     int curr_hblank = (gpu->cycles >= GPU_CYCLES_PER_HDRAW_NTSC) &&

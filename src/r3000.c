@@ -1,10 +1,10 @@
-#include "cpu.h"
+#include "r3000.h"
 #include "log.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-static const r3000_instruction_t g_r3000_secondary_table[] = {
+static const r3000_instruction g_r3000_secondary_table[] = {
     r3000_i_sll    , r3000_i_invalid, r3000_i_srl    , r3000_i_sra    ,
     r3000_i_sllv   , r3000_i_invalid, r3000_i_srlv   , r3000_i_srav   ,
     r3000_i_jr     , r3000_i_jalr   , r3000_i_invalid, r3000_i_invalid,
@@ -23,7 +23,7 @@ static const r3000_instruction_t g_r3000_secondary_table[] = {
     r3000_i_invalid, r3000_i_invalid, r3000_i_invalid, r3000_i_invalid
 };
 
-static const r3000_instruction_t g_r3000_primary_table[] = {
+static const r3000_instruction g_r3000_primary_table[] = {
     r3000_i_special, r3000_i_bxx    , r3000_i_j      , r3000_i_jal    ,
     r3000_i_beq    , r3000_i_bne    , r3000_i_blez   , r3000_i_bgtz   ,
     r3000_i_addi   , r3000_i_addiu  , r3000_i_slti   , r3000_i_sltiu  ,
@@ -42,7 +42,7 @@ static const r3000_instruction_t g_r3000_primary_table[] = {
     r3000_i_invalid, r3000_i_invalid, r3000_i_invalid, r3000_i_invalid
 };
 
-static const r3000_instruction_t g_r3000_cop0_table[] = {
+static const r3000_instruction g_r3000_cop0_table[] = {
     r3000_i_mfc0   , r3000_i_tlbr   , r3000_i_tlbwi  , r3000_i_invalid,
     r3000_i_mtc0   , r3000_i_invalid, r3000_i_tlbwr  , r3000_i_invalid,
     r3000_i_tlbp   , r3000_i_invalid, r3000_i_invalid, r3000_i_invalid,
@@ -53,7 +53,7 @@ static const r3000_instruction_t g_r3000_cop0_table[] = {
     r3000_i_invalid, r3000_i_invalid, r3000_i_invalid, r3000_i_invalid
 };
 
-static const r3000_instruction_t g_r3000_cop1_table[] = {
+static const r3000_instruction g_r3000_cop1_table[] = {
     r3000_i_mfc1   , r3000_i_invalid, r3000_i_cfc1   , r3000_i_invalid,
     r3000_i_mtc1   , r3000_i_invalid, r3000_i_ctc1   , r3000_i_invalid,
     r3000_i_invalid, r3000_i_invalid, r3000_i_invalid, r3000_i_invalid,
@@ -64,7 +64,7 @@ static const r3000_instruction_t g_r3000_cop1_table[] = {
     r3000_i_invalid, r3000_i_invalid, r3000_i_invalid, r3000_i_invalid
 };
 
-static const r3000_instruction_t g_r3000_bxx_table[] = {
+static const r3000_instruction g_r3000_bxx_table[] = {
     r3000_i_bltz   , r3000_i_bgez   , r3000_i_bltz   , r3000_i_bgez   ,
     r3000_i_bltz   , r3000_i_bgez   , r3000_i_bltz   , r3000_i_bgez   ,
     r3000_i_bltz   , r3000_i_bgez   , r3000_i_bltz   , r3000_i_bgez   ,
@@ -231,15 +231,15 @@ const char* g_mips_cop0_register_names[] = {
     cpu->branch = 1; \
     cpu->branch_taken = 1;
 
-r3000_t* r3000_create() {
-    return (r3000_t*)malloc(sizeof(r3000_t));
+r3000_state* r3000_create() {
+    return (r3000_state*)malloc(sizeof(r3000_state));
 }
 
-void r3000_destroy(r3000_t* cpu) {
+void r3000_destroy(r3000_state* cpu) {
     free(cpu);
 }
 
-uint32_t tlb_lookup(r3000_t* cpu, uint32_t key) {
+uint32_t tlb_lookup(r3000_state* cpu, uint32_t key) {
     uint32_t kvpn = key & TLBE_VPN;
     uint32_t kasid = key & TLBE_ASID;
 
@@ -275,7 +275,7 @@ int mmu_get_segment(uint32_t virt) {
     return R3000_KSEG2;
 }
 
-uint32_t mmu_map_address(r3000_t* cpu, uint32_t virt, uint32_t* phys, int write) {
+uint32_t mmu_map_address(r3000_state* cpu, uint32_t virt, uint32_t* phys, int write) {
     int seg = mmu_get_segment(virt);
 
     if (seg == R3000_KSEG0) {
@@ -294,13 +294,15 @@ uint32_t mmu_map_address(r3000_t* cpu, uint32_t virt, uint32_t* phys, int write)
     uint32_t index = tlb_lookup(cpu, entry);
 
     if (index == MMU_ENOENT) {
-        cpu->cop0_r[COP0_BADVADDR] = cpu->pc;
+        cpu->cop0_r[COP0_BADVADDR] = virt;
 
-        printf("MMU no entry pc=%08x addr=%08x write=%u\n",
-            cpu->pc,
-            virt,
-            write
-        );
+        // printf("MMU no entry pc=%08x addr=%08x write=%u\n",
+        //     cpu->pc,
+        //     virt,
+        //     write
+        // );
+
+        cpu->mmu_exception = 1;
 
         r3000_exception(cpu, write ? CAUSE_TLBS : CAUSE_TLBL);
 
@@ -310,7 +312,9 @@ uint32_t mmu_map_address(r3000_t* cpu, uint32_t virt, uint32_t* phys, int write)
     uint32_t match = cpu->tlb[index].lo;
 
     if (write && !(match & TLBE_D)) {
-        cpu->cop0_r[COP0_BADVADDR] = cpu->pc;
+        cpu->cop0_r[COP0_BADVADDR] = virt;
+
+        cpu->mmu_exception = 1;
 
         r3000_exception(cpu, CAUSE_MOD);
 
@@ -322,16 +326,16 @@ uint32_t mmu_map_address(r3000_t* cpu, uint32_t virt, uint32_t* phys, int write)
     return 0;
 }
 
-uint32_t r3000_read32(r3000_t* cpu, uint32_t addr) {
+uint32_t r3000_read32(r3000_state* cpu, uint32_t addr) {
     uint32_t phys;
 
     if (mmu_map_address(cpu, addr, &phys, 0))
-        return 0xffffffff;
+        return 0x00000000;
 
     if (addr & 3) {
         r3000_exception(cpu, CAUSE_ADEL);
 
-        return 0xffffffff;
+        return 0x00000000;
     }
 
     uint32_t data = cpu->bus_read32(phys, cpu->bus_udata);
@@ -341,16 +345,16 @@ uint32_t r3000_read32(r3000_t* cpu, uint32_t addr) {
     return data;
 }
 
-uint32_t r3000_read16(r3000_t* cpu, uint32_t addr) {
+uint32_t r3000_read16(r3000_state* cpu, uint32_t addr) {
     uint32_t phys;
 
     if (mmu_map_address(cpu, addr, &phys, 0))
-        return 0xffffffff;
+        return 0x00000000;
 
     if (addr & 1) {
         r3000_exception(cpu, CAUSE_ADEL);
 
-        return 0xffffffff;
+        return 0x00000000;
     }
 
     uint32_t data = cpu->bus_read16(phys, cpu->bus_udata);
@@ -360,11 +364,11 @@ uint32_t r3000_read16(r3000_t* cpu, uint32_t addr) {
     return data;
 }
 
-uint32_t r3000_read8(r3000_t* cpu, uint32_t addr) {
+uint32_t r3000_read8(r3000_state* cpu, uint32_t addr) {
     uint32_t phys;
 
     if (mmu_map_address(cpu, addr, &phys, 0))
-        return 0xffffffff;
+        return 0x00000000;
 
     uint32_t data = cpu->bus_read8(phys, cpu->bus_udata);
 
@@ -373,7 +377,7 @@ uint32_t r3000_read8(r3000_t* cpu, uint32_t addr) {
     return data;
 }
 
-void r3000_write32(r3000_t* cpu, uint32_t addr, uint32_t data) {
+void r3000_write32(r3000_state* cpu, uint32_t addr, uint32_t data) {
     uint32_t phys;
 
     if (mmu_map_address(cpu, addr, &phys, 1))
@@ -390,7 +394,7 @@ void r3000_write32(r3000_t* cpu, uint32_t addr, uint32_t data) {
     cpu->last_cycles += cpu->bus_query_access_cycles(cpu->bus_udata);
 }
 
-void r3000_write16(r3000_t* cpu, uint32_t addr, uint32_t data) {
+void r3000_write16(r3000_state* cpu, uint32_t addr, uint32_t data) {
     uint32_t phys;
 
     if (mmu_map_address(cpu, addr, &phys, 1))
@@ -407,7 +411,7 @@ void r3000_write16(r3000_t* cpu, uint32_t addr, uint32_t data) {
     cpu->last_cycles += cpu->bus_query_access_cycles(cpu->bus_udata);
 }
 
-void r3000_write8(r3000_t* cpu, uint32_t addr, uint32_t data) {
+void r3000_write8(r3000_state* cpu, uint32_t addr, uint32_t data) {
     uint32_t phys;
 
     if (mmu_map_address(cpu, addr, &phys, 1))
@@ -418,8 +422,8 @@ void r3000_write8(r3000_t* cpu, uint32_t addr, uint32_t data) {
     cpu->last_cycles += cpu->bus_query_access_cycles(cpu->bus_udata);
 }
 
-void r3000_init(r3000_t* cpu, r3000_bus_t* bus) {
-    memset(cpu, 0, sizeof(r3000_t));
+void r3000_init(r3000_state* cpu, r3000_bus* bus) {
+    memset(cpu, 0, sizeof(r3000_state));
 
     cpu->bus_read32 = bus->read32;
     cpu->bus_read16 = bus->read16;
@@ -438,7 +442,7 @@ void r3000_init(r3000_t* cpu, r3000_bus_t* bus) {
     cpu->cop0_r[COP0_RANDOM] = 63 << 8;
 }
 
-void r3000_cycle(r3000_t* cpu) {
+void r3000_cycle(r3000_state* cpu) {
     cpu->last_cycles = 0;
 
     cpu->saved_pc = cpu->pc;
@@ -450,6 +454,12 @@ void r3000_cycle(r3000_t* cpu) {
         r3000_exception(cpu, CAUSE_ADEL);
 
     cpu->opcode = r3000_read32(cpu, cpu->pc);
+
+    if (cpu->mmu_exception) {
+        cpu->mmu_exception = 0;
+
+        return;
+    }
 
     cpu->pc = cpu->next_pc;
     cpu->next_pc += 4;
@@ -476,11 +486,11 @@ void r3000_cycle(r3000_t* cpu) {
     cpu->r[0] = 0;
 }
 
-int r3000_check_irq(r3000_t* cpu) {
+int r3000_check_irq(r3000_state* cpu) {
     return (cpu->cop0_r[COP0_SR] & SR_IEC) && (cpu->cop0_r[COP0_SR] & cpu->cop0_r[COP0_CAUSE] & 0x00000700);
 }
 
-void r3000_set_pc(r3000_t* cpu, uint32_t addr) {
+void r3000_set_pc(r3000_state* cpu, uint32_t addr) {
     cpu->pc = addr;
     cpu->next_pc = cpu->pc + 4;
 }
@@ -497,7 +507,7 @@ int is_memory_exception(uint32_t cause) {
     return 0;
 }
 
-void r3000_exception(r3000_t* cpu, uint32_t cause) {
+void r3000_exception(r3000_state* cpu, uint32_t cause) {
     cpu->cop0_r[COP0_CAUSE] &= 0x0000ff00;
 
     // Set excode and clear 3 LSBs
@@ -505,8 +515,8 @@ void r3000_exception(r3000_t* cpu, uint32_t cause) {
     cpu->cop0_r[COP0_CAUSE] |= cause;
 
     // Set BadVaddr when exception is a memory exception else reset
-    cpu->cop0_r[COP0_BADVADDR] = is_memory_exception(cause) ?
-        cpu->saved_pc : 0;
+    if (!is_memory_exception(cause))
+        cpu->cop0_r[COP0_BADVADDR] = 0;
 
     // Update Context BadVPN field (and clear lower 2 bits)
     cpu->cop0_r[COP0_CONTEXT] &= ~0x1fffff;
@@ -534,24 +544,31 @@ void r3000_exception(r3000_t* cpu, uint32_t cause) {
     cpu->next_pc = cpu->pc + 4;
 
     // printf("R3000 exception %08x %08x %08x\n", cause >> 2, cpu->saved_pc, cpu->pc);
+    // printf("BadVaddr=%08x\nContext=%08x\nRandom=%08x\nIndex=%08x\n",
+    //     cpu->cop0_r[8],
+    //     cpu->cop0_r[4],
+    //     cpu->cop0_r[1],
+    //     cpu->cop0_r[0]
+    // );
+    // exit(1);
 }
 
-void r3000_set_irq_pending(r3000_t* cpu) {
+void r3000_set_irq_pending(r3000_state* cpu) {
     cpu->cop0_r[COP0_CAUSE] |= SR_IM2;
 }
 
-void r3000_i_invalid(r3000_t* cpu) {
+void r3000_i_invalid(r3000_state* cpu) {
     log_fatal("%08x: Illegal instruction %08x", cpu->pc - 8, cpu->opcode);
 
     r3000_exception(cpu, CAUSE_RI);
 }
 
 // Primary
-void r3000_i_special(r3000_t* cpu) {
+void r3000_i_special(r3000_state* cpu) {
     g_r3000_secondary_table[SOP](cpu);
 }
 
-void r3000_i_bxx(r3000_t* cpu) {
+void r3000_i_bxx(r3000_state* cpu) {
     cpu->branch = 1;
     cpu->branch_taken = 0;
 
@@ -559,7 +576,7 @@ void r3000_i_bxx(r3000_t* cpu) {
 }
 
 // BXX
-void r3000_i_bltz(r3000_t* cpu) {
+void r3000_i_bltz(r3000_state* cpu) {
     TRACE_B("bltz");
 
     int32_t s = (int32_t)cpu->r[S];
@@ -571,7 +588,7 @@ void r3000_i_bltz(r3000_t* cpu) {
     }
 }
 
-void r3000_i_bgez(r3000_t* cpu) {
+void r3000_i_bgez(r3000_state* cpu) {
     TRACE_B("bgez");
 
     int32_t s = (int32_t)cpu->r[S];
@@ -583,7 +600,7 @@ void r3000_i_bgez(r3000_t* cpu) {
     }
 }
 
-void r3000_i_bltzal(r3000_t* cpu) {
+void r3000_i_bltzal(r3000_state* cpu) {
     TRACE_B("bltzal");
 
     int32_t s = (int32_t)cpu->r[S];
@@ -597,7 +614,7 @@ void r3000_i_bltzal(r3000_t* cpu) {
     }
 }
 
-void r3000_i_bgezal(r3000_t* cpu) {
+void r3000_i_bgezal(r3000_state* cpu) {
     TRACE_B("bgezal");
 
     int32_t s = (int32_t)cpu->r[S];
@@ -611,7 +628,7 @@ void r3000_i_bgezal(r3000_t* cpu) {
     }
 }
 
-void r3000_i_j(r3000_t* cpu) {
+void r3000_i_j(r3000_state* cpu) {
     cpu->branch = 1;
 
     TRACE_I26("j");
@@ -621,7 +638,7 @@ void r3000_i_j(r3000_t* cpu) {
     cpu->next_pc = (cpu->next_pc & 0xf0000000) | (IMM26 << 2);
 }
 
-void r3000_i_jal(r3000_t* cpu) {
+void r3000_i_jal(r3000_state* cpu) {
     cpu->branch = 1;
 
     TRACE_I26("jal");
@@ -633,7 +650,7 @@ void r3000_i_jal(r3000_t* cpu) {
     cpu->next_pc = (cpu->next_pc & 0xf0000000) | (IMM26 << 2);
 }
 
-void r3000_i_beq(r3000_t* cpu) {
+void r3000_i_beq(r3000_state* cpu) {
     cpu->branch = 1;
     cpu->branch_taken = 0;
 
@@ -649,7 +666,7 @@ void r3000_i_beq(r3000_t* cpu) {
     }
 }
 
-void r3000_i_bne(r3000_t* cpu) {
+void r3000_i_bne(r3000_state* cpu) {
     cpu->branch = 1;
     cpu->branch_taken = 0;
 
@@ -665,7 +682,7 @@ void r3000_i_bne(r3000_t* cpu) {
     }
 }
 
-void r3000_i_blez(r3000_t* cpu) {
+void r3000_i_blez(r3000_state* cpu) {
     cpu->branch = 1;
     cpu->branch_taken = 0;
 
@@ -680,7 +697,7 @@ void r3000_i_blez(r3000_t* cpu) {
     }
 }
 
-void r3000_i_bgtz(r3000_t* cpu) {
+void r3000_i_bgtz(r3000_state* cpu) {
     cpu->branch = 1;
     cpu->branch_taken = 0;
 
@@ -695,7 +712,7 @@ void r3000_i_bgtz(r3000_t* cpu) {
     }
 }
 
-void r3000_i_addi(r3000_t* cpu) {
+void r3000_i_addi(r3000_state* cpu) {
     TRACE_I16D("addi");
 
     uint32_t s = cpu->r[S];
@@ -713,7 +730,7 @@ void r3000_i_addi(r3000_t* cpu) {
     }
 }
 
-void r3000_i_addiu(r3000_t* cpu) {
+void r3000_i_addiu(r3000_state* cpu) {
     TRACE_I16D("addiu");
 
     uint32_t s = cpu->r[S];
@@ -723,7 +740,7 @@ void r3000_i_addiu(r3000_t* cpu) {
     cpu->r[T] = s + IMM16S;
 }
 
-void r3000_i_slti(r3000_t* cpu) {
+void r3000_i_slti(r3000_state* cpu) {
     TRACE_I16D("slti");
 
     int32_t s = (int32_t)cpu->r[S];
@@ -733,7 +750,7 @@ void r3000_i_slti(r3000_t* cpu) {
     cpu->r[T] = s < IMM16S;
 }
 
-void r3000_i_sltiu(r3000_t* cpu) {
+void r3000_i_sltiu(r3000_state* cpu) {
     TRACE_I16D("sltiu");
 
     uint32_t s = cpu->r[S];
@@ -743,7 +760,7 @@ void r3000_i_sltiu(r3000_t* cpu) {
     cpu->r[T] = s < IMM16S;
 }
 
-void r3000_i_andi(r3000_t* cpu) {
+void r3000_i_andi(r3000_state* cpu) {
     TRACE_I16D("andi");
 
     uint32_t s = cpu->r[S];
@@ -753,7 +770,7 @@ void r3000_i_andi(r3000_t* cpu) {
     cpu->r[T] = s & IMM16;
 }
 
-void r3000_i_ori(r3000_t* cpu) {
+void r3000_i_ori(r3000_state* cpu) {
     TRACE_I16D("ori");
 
     uint32_t s = cpu->r[S];
@@ -763,7 +780,7 @@ void r3000_i_ori(r3000_t* cpu) {
     cpu->r[T] = s | IMM16;
 }
 
-void r3000_i_xori(r3000_t* cpu) {
+void r3000_i_xori(r3000_state* cpu) {
     TRACE_I16D("xori");
 
     uint32_t s = cpu->r[S];
@@ -773,7 +790,7 @@ void r3000_i_xori(r3000_t* cpu) {
     cpu->r[T] = s ^ IMM16;
 }
 
-void r3000_i_lui(r3000_t* cpu) {
+void r3000_i_lui(r3000_state* cpu) {
     TRACE_I16S("lui");
 
     DO_PENDING_LOAD;
@@ -781,29 +798,29 @@ void r3000_i_lui(r3000_t* cpu) {
     cpu->r[T] = IMM16 << 16;
 }
 
-void r3000_i_cop0(r3000_t* cpu) {
+void r3000_i_cop0(r3000_state* cpu) {
     g_r3000_cop0_table[S](cpu);
 }
 
-void r3000_i_cop1(r3000_t* cpu) {
+void r3000_i_cop1(r3000_state* cpu) {
     DO_PENDING_LOAD;
 
     r3000_exception(cpu, CAUSE_CPU);
 }
 
-void r3000_i_cop2(r3000_t* cpu) {
+void r3000_i_cop2(r3000_state* cpu) {
     DO_PENDING_LOAD;
 
     r3000_exception(cpu, CAUSE_CPU);
 }
 
-void r3000_i_cop3(r3000_t* cpu) {
+void r3000_i_cop3(r3000_state* cpu) {
     DO_PENDING_LOAD;
 
     r3000_exception(cpu, CAUSE_CPU);
 }
 
-void r3000_i_lb(r3000_t* cpu) {
+void r3000_i_lb(r3000_state* cpu) {
     TRACE_M("lb");
 
     uint32_t s = cpu->r[S];
@@ -814,7 +831,7 @@ void r3000_i_lb(r3000_t* cpu) {
     cpu->load_v = SE8(r3000_read8(cpu, s + IMM16S));
 }
 
-void r3000_i_lh(r3000_t* cpu) {
+void r3000_i_lh(r3000_state* cpu) {
     TRACE_M("lh");
 
     uint32_t s = cpu->r[S];
@@ -827,7 +844,7 @@ void r3000_i_lh(r3000_t* cpu) {
     cpu->load_v = SE16(r3000_read16(cpu, addr));
 }
 
-void r3000_i_lwl(r3000_t* cpu) {
+void r3000_i_lwl(r3000_state* cpu) {
     TRACE_M("lwl");
 
     uint32_t addr = cpu->r[S] + IMM16S;
@@ -846,7 +863,7 @@ void r3000_i_lwl(r3000_t* cpu) {
     cpu->load_d = T;
 }
 
-void r3000_i_lw(r3000_t* cpu) {
+void r3000_i_lw(r3000_state* cpu) {
     TRACE_M("lw");
 
     uint32_t s = cpu->r[S];
@@ -858,7 +875,7 @@ void r3000_i_lw(r3000_t* cpu) {
     cpu->load_v = r3000_read32(cpu, addr);
 }
 
-void r3000_i_lbu(r3000_t* cpu) {
+void r3000_i_lbu(r3000_state* cpu) {
     TRACE_M("lbu");
 
     uint32_t s = cpu->r[S];
@@ -869,7 +886,7 @@ void r3000_i_lbu(r3000_t* cpu) {
     cpu->load_v = r3000_read8(cpu, s + IMM16S);
 }
 
-void r3000_i_lhu(r3000_t* cpu) {
+void r3000_i_lhu(r3000_state* cpu) {
     TRACE_M("lhu");
 
     uint32_t s = cpu->r[S];
@@ -881,7 +898,7 @@ void r3000_i_lhu(r3000_t* cpu) {
     cpu->load_v = r3000_read16(cpu, addr);
 }
 
-void r3000_i_lwr(r3000_t* cpu) {
+void r3000_i_lwr(r3000_state* cpu) {
     TRACE_M("lwr");
 
     uint32_t addr = cpu->r[S] + IMM16S;
@@ -900,7 +917,7 @@ void r3000_i_lwr(r3000_t* cpu) {
     cpu->load_d = T;
 }
 
-void r3000_i_sb(r3000_t* cpu) {
+void r3000_i_sb(r3000_state* cpu) {
     TRACE_M("sb");
 
     uint32_t s = cpu->r[S];
@@ -918,7 +935,7 @@ void r3000_i_sb(r3000_t* cpu) {
     r3000_write8(cpu, s + IMM16S, t);
 }
 
-void r3000_i_sh(r3000_t* cpu) {
+void r3000_i_sh(r3000_state* cpu) {
     TRACE_M("sh");
 
     uint32_t s = cpu->r[S];
@@ -937,7 +954,7 @@ void r3000_i_sh(r3000_t* cpu) {
     r3000_write16(cpu, addr, t);
 }
 
-void r3000_i_swl(r3000_t* cpu) {
+void r3000_i_swl(r3000_state* cpu) {
     TRACE_M("swl");
 
     uint32_t s = cpu->r[S];
@@ -958,7 +975,7 @@ void r3000_i_swl(r3000_t* cpu) {
     r3000_write32(cpu, aligned, v);
 }
 
-void r3000_i_sw(r3000_t* cpu) {
+void r3000_i_sw(r3000_state* cpu) {
     TRACE_M("sw");
 
     uint32_t s = cpu->r[S];
@@ -977,7 +994,7 @@ void r3000_i_sw(r3000_t* cpu) {
     r3000_write32(cpu, addr, t);
 }
 
-void r3000_i_swr(r3000_t* cpu) {
+void r3000_i_swr(r3000_state* cpu) {
     TRACE_M("swr");
 
     uint32_t s = cpu->r[S];
@@ -998,40 +1015,40 @@ void r3000_i_swr(r3000_t* cpu) {
     r3000_write32(cpu, aligned, v);
 }
 
-void r3000_i_lwc0(r3000_t* cpu) {
+void r3000_i_lwc0(r3000_state* cpu) {
     r3000_exception(cpu, CAUSE_CPU);
 }
 
-void r3000_i_lwc1(r3000_t* cpu) {
+void r3000_i_lwc1(r3000_state* cpu) {
     r3000_exception(cpu, CAUSE_CPU);
 }
 
-void r3000_i_lwc2(r3000_t* cpu) {
+void r3000_i_lwc2(r3000_state* cpu) {
     r3000_exception(cpu, CAUSE_CPU);
 }
 
-void r3000_i_lwc3(r3000_t* cpu) {
+void r3000_i_lwc3(r3000_state* cpu) {
     r3000_exception(cpu, CAUSE_CPU);
 }
 
-void r3000_i_swc0(r3000_t* cpu) {
+void r3000_i_swc0(r3000_state* cpu) {
     r3000_exception(cpu, CAUSE_CPU);
 }
 
-void r3000_i_swc1(r3000_t* cpu) {
+void r3000_i_swc1(r3000_state* cpu) {
     r3000_exception(cpu, CAUSE_CPU);
 }
 
-void r3000_i_swc2(r3000_t* cpu) {
+void r3000_i_swc2(r3000_state* cpu) {
     r3000_exception(cpu, CAUSE_CPU);
 }
 
-void r3000_i_swc3(r3000_t* cpu) {
+void r3000_i_swc3(r3000_state* cpu) {
     r3000_exception(cpu, CAUSE_CPU);
 }
 
 // Secondary
-void r3000_i_sll(r3000_t* cpu) {
+void r3000_i_sll(r3000_state* cpu) {
     TRACE_I5D("sll");
 
     uint32_t t = cpu->r[T];
@@ -1041,7 +1058,7 @@ void r3000_i_sll(r3000_t* cpu) {
     cpu->r[D] = t << IMM5;
 }
 
-void r3000_i_srl(r3000_t* cpu) {
+void r3000_i_srl(r3000_state* cpu) {
     TRACE_I5D("srl");
 
     uint32_t t = cpu->r[T];
@@ -1051,7 +1068,7 @@ void r3000_i_srl(r3000_t* cpu) {
     cpu->r[D] = t >> IMM5;
 }
 
-void r3000_i_sra(r3000_t* cpu) {
+void r3000_i_sra(r3000_state* cpu) {
     TRACE_I5D("sra");
 
     int32_t t = (int32_t)cpu->r[T];
@@ -1061,7 +1078,7 @@ void r3000_i_sra(r3000_t* cpu) {
     cpu->r[D] = t >> IMM5;
 }
 
-void r3000_i_sllv(r3000_t* cpu) {
+void r3000_i_sllv(r3000_state* cpu) {
     TRACE_RT("sllv");
 
     uint32_t s = cpu->r[S];
@@ -1072,7 +1089,7 @@ void r3000_i_sllv(r3000_t* cpu) {
     cpu->r[D] = t << (s & 0x1f);
 }
 
-void r3000_i_srlv(r3000_t* cpu) {
+void r3000_i_srlv(r3000_state* cpu) {
     TRACE_RT("srlv");
 
     uint32_t s = cpu->r[S];
@@ -1083,7 +1100,7 @@ void r3000_i_srlv(r3000_t* cpu) {
     cpu->r[D] = t >> (s & 0x1f);
 }
 
-void r3000_i_srav(r3000_t* cpu) {
+void r3000_i_srav(r3000_state* cpu) {
     TRACE_RT("srav");
 
     uint32_t s = cpu->r[S];
@@ -1094,7 +1111,7 @@ void r3000_i_srav(r3000_t* cpu) {
     cpu->r[D] = t >> (s & 0x1f);
 }
 
-void r3000_i_jr(r3000_t* cpu) {
+void r3000_i_jr(r3000_state* cpu) {
     cpu->branch = 1;
 
     TRACE_RS("jr");
@@ -1106,7 +1123,7 @@ void r3000_i_jr(r3000_t* cpu) {
     cpu->next_pc = s;
 }
 
-void r3000_i_jalr(r3000_t* cpu) {
+void r3000_i_jalr(r3000_state* cpu) {
     cpu->branch = 1;
 
     TRACE_RD("jalr");
@@ -1120,7 +1137,7 @@ void r3000_i_jalr(r3000_t* cpu) {
     cpu->next_pc = s;
 }
 
-void r3000_i_syscall(r3000_t* cpu) {
+void r3000_i_syscall(r3000_state* cpu) {
     TRACE_I20("syscall");
     
     DO_PENDING_LOAD;
@@ -1128,7 +1145,7 @@ void r3000_i_syscall(r3000_t* cpu) {
     r3000_exception(cpu, CAUSE_SYSCALL);
 }
 
-void r3000_i_break(r3000_t* cpu) {
+void r3000_i_break(r3000_state* cpu) {
     TRACE_I20("break");
 
     DO_PENDING_LOAD;
@@ -1136,7 +1153,7 @@ void r3000_i_break(r3000_t* cpu) {
     r3000_exception(cpu, CAUSE_BP);
 }
 
-void r3000_i_mfhi(r3000_t* cpu) {
+void r3000_i_mfhi(r3000_state* cpu) {
     TRACE_MTF("mfhi");
 
     DO_PENDING_LOAD;
@@ -1144,7 +1161,7 @@ void r3000_i_mfhi(r3000_t* cpu) {
     cpu->r[D] = cpu->hi;
 }
 
-void r3000_i_mthi(r3000_t* cpu) {
+void r3000_i_mthi(r3000_state* cpu) {
     TRACE_MTF("mthi");
 
     DO_PENDING_LOAD;
@@ -1152,7 +1169,7 @@ void r3000_i_mthi(r3000_t* cpu) {
     cpu->hi = cpu->r[S];
 }
 
-void r3000_i_mflo(r3000_t* cpu) {
+void r3000_i_mflo(r3000_state* cpu) {
     TRACE_MTF("mflo");
 
     DO_PENDING_LOAD;
@@ -1160,7 +1177,7 @@ void r3000_i_mflo(r3000_t* cpu) {
     cpu->r[D] = cpu->lo;
 }
 
-void r3000_i_mtlo(r3000_t* cpu) {
+void r3000_i_mtlo(r3000_state* cpu) {
     TRACE_MTF("mtlo");
 
     DO_PENDING_LOAD;
@@ -1168,7 +1185,7 @@ void r3000_i_mtlo(r3000_t* cpu) {
     cpu->lo = cpu->r[S];
 }
 
-void r3000_i_mult(r3000_t* cpu) {
+void r3000_i_mult(r3000_state* cpu) {
     TRACE_MD("mult");
 
     int64_t s = (int64_t)((int32_t)cpu->r[S]);
@@ -1182,7 +1199,7 @@ void r3000_i_mult(r3000_t* cpu) {
     cpu->lo = r & 0xffffffff;
 }
 
-void r3000_i_multu(r3000_t* cpu) {
+void r3000_i_multu(r3000_state* cpu) {
     TRACE_MD("multu");
 
     uint64_t s = (uint64_t)cpu->r[S];
@@ -1196,7 +1213,7 @@ void r3000_i_multu(r3000_t* cpu) {
     cpu->lo = r & 0xffffffff;
 }
 
-void r3000_i_div(r3000_t* cpu) {
+void r3000_i_div(r3000_state* cpu) {
     TRACE_MD("div");
 
     int32_t s = (int32_t)cpu->r[S];
@@ -1216,7 +1233,7 @@ void r3000_i_div(r3000_t* cpu) {
     }
 }
 
-void r3000_i_divu(r3000_t* cpu) {
+void r3000_i_divu(r3000_state* cpu) {
     TRACE_MD("divu");
 
     uint32_t s = cpu->r[S];
@@ -1233,7 +1250,7 @@ void r3000_i_divu(r3000_t* cpu) {
     }
 }
 
-void r3000_i_add(r3000_t* cpu) {
+void r3000_i_add(r3000_state* cpu) {
     TRACE_RT("add");
 
     int32_t s = cpu->r[S];
@@ -1251,7 +1268,7 @@ void r3000_i_add(r3000_t* cpu) {
     }
 }
 
-void r3000_i_addu(r3000_t* cpu) {
+void r3000_i_addu(r3000_state* cpu) {
     TRACE_RT("addu");
 
     uint32_t s = cpu->r[S];
@@ -1262,7 +1279,7 @@ void r3000_i_addu(r3000_t* cpu) {
     cpu->r[D] = s + t;
 }
 
-void r3000_i_sub(r3000_t* cpu) {
+void r3000_i_sub(r3000_state* cpu) {
     TRACE_RT("sub");
 
     int32_t s = (int32_t)cpu->r[S];
@@ -1280,7 +1297,7 @@ void r3000_i_sub(r3000_t* cpu) {
     }
 }
 
-void r3000_i_subu(r3000_t* cpu) {
+void r3000_i_subu(r3000_state* cpu) {
     TRACE_RT("subu");
 
     uint32_t s = cpu->r[S];
@@ -1291,7 +1308,7 @@ void r3000_i_subu(r3000_t* cpu) {
     cpu->r[D] = s - t;
 }
 
-void r3000_i_and(r3000_t* cpu) {
+void r3000_i_and(r3000_state* cpu) {
     TRACE_RT("and");
 
     uint32_t s = cpu->r[S];
@@ -1302,7 +1319,7 @@ void r3000_i_and(r3000_t* cpu) {
     cpu->r[D] = s & t;
 }
 
-void r3000_i_or(r3000_t* cpu) {
+void r3000_i_or(r3000_state* cpu) {
     TRACE_RT("or");
 
     uint32_t s = cpu->r[S];
@@ -1313,7 +1330,7 @@ void r3000_i_or(r3000_t* cpu) {
     cpu->r[D] = s | t;
 }
 
-void r3000_i_xor(r3000_t* cpu) {
+void r3000_i_xor(r3000_state* cpu) {
     TRACE_RT("xor");
 
     uint32_t s = cpu->r[S];
@@ -1324,7 +1341,7 @@ void r3000_i_xor(r3000_t* cpu) {
     cpu->r[D] = (s ^ t);
 }
 
-void r3000_i_nor(r3000_t* cpu) {
+void r3000_i_nor(r3000_state* cpu) {
     TRACE_RT("nor");
 
     uint32_t s = cpu->r[S];
@@ -1335,7 +1352,7 @@ void r3000_i_nor(r3000_t* cpu) {
     cpu->r[D] = ~(s | t);
 }
 
-void r3000_i_slt(r3000_t* cpu) {
+void r3000_i_slt(r3000_state* cpu) {
     TRACE_RT("slt");
 
     int32_t s = (int32_t)cpu->r[S];
@@ -1346,7 +1363,7 @@ void r3000_i_slt(r3000_t* cpu) {
     cpu->r[D] = s < t;
 }
 
-void r3000_i_sltu(r3000_t* cpu) {
+void r3000_i_sltu(r3000_state* cpu) {
     TRACE_RT("sltu");
 
     uint32_t s = cpu->r[S];
@@ -1358,7 +1375,7 @@ void r3000_i_sltu(r3000_t* cpu) {
 }
 
 // COP0
-void r3000_i_mfc0(r3000_t* cpu) {
+void r3000_i_mfc0(r3000_state* cpu) {
     TRACE_C0M("mfc0");
 
     DO_PENDING_LOAD;
@@ -1367,7 +1384,7 @@ void r3000_i_mfc0(r3000_t* cpu) {
     cpu->load_d = T;
 }
 
-void r3000_i_mtc0(r3000_t* cpu) {
+void r3000_i_mtc0(r3000_state* cpu) {
     TRACE_C0M("mtc0");
 
     uint32_t t = cpu->r[T];
@@ -1377,7 +1394,7 @@ void r3000_i_mtc0(r3000_t* cpu) {
     cpu->cop0_r[D] = t & g_r3000_cop0_write_mask_table[D];
 }
 
-void r3000_i_rfe(r3000_t* cpu) {
+void r3000_i_rfe(r3000_state* cpu) {
     switch (SOP) {
         case 1: r3000_i_tlbr(cpu); return;
         case 2: r3000_i_tlbwi(cpu); return;
@@ -1395,7 +1412,7 @@ void r3000_i_rfe(r3000_t* cpu) {
     cpu->cop0_r[COP0_SR] |= mode >> 2;
 }
 
-void r3000_i_tlbp(r3000_t* cpu) {
+void r3000_i_tlbp(r3000_state* cpu) {
     TRACE_N("tlbp");
 
     DO_PENDING_LOAD;
@@ -1410,7 +1427,7 @@ void r3000_i_tlbp(r3000_t* cpu) {
     }
 }
 
-void r3000_i_tlbr(r3000_t* cpu) {
+void r3000_i_tlbr(r3000_state* cpu) {
     TRACE_N("tlbr");
 
     DO_PENDING_LOAD;
@@ -1421,7 +1438,7 @@ void r3000_i_tlbr(r3000_t* cpu) {
     cpu->cop0_r[COP0_ENTRYHI] = cpu->tlb[index].hi;
 }
 
-void r3000_i_tlbwi(r3000_t* cpu) {
+void r3000_i_tlbwi(r3000_state* cpu) {
     TRACE_N("tlbwi");
 
     DO_PENDING_LOAD;
@@ -1432,7 +1449,7 @@ void r3000_i_tlbwi(r3000_t* cpu) {
     cpu->tlb[index].hi = cpu->cop0_r[COP0_ENTRYHI];
 }
 
-void r3000_i_tlbwr(r3000_t* cpu) {
+void r3000_i_tlbwr(r3000_state* cpu) {
     TRACE_N("tlbwr");
 
     DO_PENDING_LOAD;
@@ -1441,14 +1458,20 @@ void r3000_i_tlbwr(r3000_t* cpu) {
 
     cpu->tlb[index].lo = cpu->cop0_r[COP0_ENTRYLO];
     cpu->tlb[index].hi = cpu->cop0_r[COP0_ENTRYHI];
+
+    printf("TLB refill index=%08x %08x -> %08x\n",
+        index,
+        cpu->tlb[index].hi,
+        cpu->tlb[index].lo
+    );
 }
 
 // To-do: COP1 (FPU)
-void r3000_i_mfc1(r3000_t* cpu) {}
-void r3000_i_cfc1(r3000_t* cpu) {}
-void r3000_i_mtc1(r3000_t* cpu) {}
-void r3000_i_ctc1(r3000_t* cpu) {}
-void r3000_i_fpu(r3000_t* cpu) {}
+void r3000_i_mfc1(r3000_state* cpu) {}
+void r3000_i_cfc1(r3000_state* cpu) {}
+void r3000_i_mtc1(r3000_state* cpu) {}
+void r3000_i_ctc1(r3000_state* cpu) {}
+void r3000_i_fpu(r3000_state* cpu) {}
 
 #undef R_R0
 #undef R_A0
