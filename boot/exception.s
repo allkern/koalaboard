@@ -123,18 +123,18 @@ unhandled_exception:
 
 # To-do: Implement jumptable
 syscall_handler:
-    # Initialize IRQ handler
-    la      $t0, SYS_IRQ_HANDLER_PTR
-    sw      $a0, 0($t0)
+    # # Initialize IRQ handler
+    # la      $t0, SYS_IRQ_HANDLER_PTR
+    # sw      $a0, 0($t0)
 
-    # Acknowledge pending IRQs
-    la      $k1, 0x9f801070
-    sw      $zero, 0($k1)
+    # # Acknowledge pending IRQs
+    # la      $k1, 0x9f801070
+    # sw      $zero, 0($k1)
 
-    # Enable VBLANK IRQ
-    li      $k0, 0x1
-    la      $k1, 0x9f801074
-    sw      $k0, 0($k1)
+    # # Enable VBLANK IRQ
+    # li      $k0, 0x1
+    # la      $k1, 0x9f801074
+    # sw      $k0, 0($k1)
 
     # Can't enable interrupts within exception handler
     # li      $k0, 0xff03
@@ -142,6 +142,9 @@ syscall_handler:
 
     # Restore saved state
     xrestore
+
+    # la      $k0, SYS_HEAP_BASE_PAGE
+    # lw      $a0, 0($k0)
 
     # Jump to EPC (+4 to skip syscall instr)
     mfc0    $k0, $14
@@ -181,24 +184,22 @@ irq_handler:
 
 exc_handler:
     # Assume TLB refill needed
-    # Get unmapped address from BadVaddr
-    mfc0    $k0, $8
-
-    # Get pointer to pagetable entry
-    srl     $k0, 9
-    andi    $k0, 0xfff8
-    lui     $k1, 0x9000
-    or      $k0, $k0, $k1
+    # Load mapping for unmapped page from kernel memory
+    # Context was setup so it automatically points to the
+    # correct mapping.
+    mfc0    $k0, $4
 
     # Load mapping from kernel memory
-    lw      $k1, 4($k0)
-    mtc0    $k1, $2
+    # Note: EntryHi is loaded by the CPU
     lw      $k1, 0($k0)
-    mtc0    $k1, $10
+    mtc0    $k1, $2
 
     # Write mapping to TLB (random entry)
     tlbwr
 
+    # mtc0    $0, $0
+    # tlbwi
+ 
     # # Call registered EXC handler
     # la      $t0, SYS_KMEM_BASE
     # lw      $t0, 4($t0)

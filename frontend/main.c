@@ -372,10 +372,10 @@ int main(int argc, const char* argv[]) {
 
             // printf("%u segments required\n", segments);
 
-            uint32_t vaddr = phdr->p_vaddr;
-            uint32_t paddr = phdr->p_paddr;
+            // uint32_t vaddr = phdr->p_vaddr;
+            // uint32_t paddr = phdr->p_paddr;
 
-            elf_load_segment(elf, i, &ram->buf[paddr]);
+            elf_load_segment(elf, i, &ram->buf[phdr->p_paddr]);
 
             // for (int s = 0; s < segments; s++) {
             //     cpu->tlb[seg].hi = vaddr & 0xfffff000;
@@ -412,14 +412,12 @@ int main(int argc, const char* argv[]) {
 
     int total_pages = RAM_SIZE / 0x1000;
 
-    printf("%d pages, %d KiB\n", total_pages, (total_pages * 8) / 1024);
+    printf("%d pages, %d KiB\n", total_pages, (total_pages * 4) / 1024);
 
     uint32_t* ptr = nvram->buf;
 
-    for (int i = 0; i < total_pages; i++) {
-        ptr[(i<<1)] = i << 12;
-        ptr[(i<<1)+1] = (RAM_PHYS_BASE + (i << 12)) | TLBE_G | TLBE_V | TLBE_D;
-    }
+    for (int i = 0; i < total_pages; i++)
+        ptr[i] = (RAM_PHYS_BASE + (i << 12)) | TLBE_G | TLBE_V | TLBE_D;
 
     printf("Initializing kernel variables...\n");
     
@@ -431,6 +429,9 @@ int main(int argc, const char* argv[]) {
 
     // Set BEV (exception vector)
     cpu->cop0_r[COP0_SR] = 0x400000;
+
+    // Set PTEBase to 90000000
+    cpu->cop0_r[COP0_CONTEXT] = 0x90000000;
 
     r3000_set_pc(cpu, elf->ehdr->e_entry);
 

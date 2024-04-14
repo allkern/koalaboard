@@ -295,6 +295,8 @@ uint32_t mmu_map_address(r3000_state* cpu, uint32_t virt, uint32_t* phys, int wr
 
     if (index == MMU_ENOENT) {
         cpu->cop0_r[COP0_BADVADDR] = virt;
+        cpu->cop0_r[COP0_ENTRYHI] &= 0xfff;
+        cpu->cop0_r[COP0_ENTRYHI] |= virt & 0xfffff000;
 
         // printf("MMU no entry pc=%08x addr=%08x write=%u\n",
         //     cpu->pc,
@@ -313,8 +315,16 @@ uint32_t mmu_map_address(r3000_state* cpu, uint32_t virt, uint32_t* phys, int wr
 
     if (write && !(match & TLBE_D)) {
         cpu->cop0_r[COP0_BADVADDR] = virt;
+        cpu->cop0_r[COP0_ENTRYHI] &= 0xfff;
+        cpu->cop0_r[COP0_ENTRYHI] |= virt & 0xfffff000;
 
         cpu->mmu_exception = 1;
+
+        printf("MMU segfault pc=%08x addr=%08x write=%u\n",
+            cpu->pc,
+            virt,
+            write
+        );
 
         r3000_exception(cpu, CAUSE_MOD);
 
@@ -476,11 +486,13 @@ void r3000_cycle(r3000_state* cpu) {
     cpu->total_cycles += cpu->last_cycles;
 
     // Update Random register
-    cpu->cop0_r[COP0_RANDOM] -= 2 << 8;
+    cpu->cop0_r[COP0_RANDOM] >>= 8;
+    cpu->cop0_r[COP0_RANDOM] -= 2;
 
-    if (cpu->cop0_r[COP0_RANDOM] < (8 << 8))
-        cpu->cop0_r[COP0_RANDOM] += 63 << 8;
+    if (cpu->cop0_r[COP0_RANDOM] < 8)
+        cpu->cop0_r[COP0_RANDOM] += 64;
 
+    cpu->cop0_r[COP0_RANDOM] <<= 8;
     cpu->cop0_r[COP0_RANDOM] &= 0x3f00;
 
     cpu->r[0] = 0;
@@ -520,7 +532,7 @@ void r3000_exception(r3000_state* cpu, uint32_t cause) {
 
     // Update Context BadVPN field (and clear lower 2 bits)
     cpu->cop0_r[COP0_CONTEXT] &= ~0x1fffff;
-    cpu->cop0_r[COP0_CONTEXT] |= cpu->saved_pc & 0x1ffffc;
+    cpu->cop0_r[COP0_CONTEXT] |= (cpu->cop0_r[COP0_BADVADDR] >> 10) & 0x1ffffc;
 
     // Save PC at which exception happened
     cpu->cop0_r[COP0_EPC] = cpu->saved_pc;
@@ -543,12 +555,19 @@ void r3000_exception(r3000_state* cpu, uint32_t cause) {
     cpu->pc = (cpu->cop0_r[COP0_SR] & SR_BEV) ? 0xbfc00180 : 0x80000080;
     cpu->next_pc = cpu->pc + 4;
 
-    // printf("R3000 exception %08x %08x %08x\n", cause >> 2, cpu->saved_pc, cpu->pc);
-    // printf("BadVaddr=%08x\nContext=%08x\nRandom=%08x\nIndex=%08x\n",
+    printf("R3000 exception cause=%08x spc=%08x pc=%08x badvaddr=%08x ctx=%08x eh=%08x\n",
+        cause >> 2,
+        cpu->saved_pc,
+        cpu->pc,
+        cpu->cop0_r[COP0_BADVADDR],
+        cpu->cop0_r[COP0_CONTEXT],
+        cpu->cop0_r[COP0_ENTRYHI]
+    );
+    // printf("BadVaddr=%08x Context=%08x Random=%08x EntryHi=%08x\n",
     //     cpu->cop0_r[8],
     //     cpu->cop0_r[4],
     //     cpu->cop0_r[1],
-    //     cpu->cop0_r[0]
+    //     cpu->cop0_r[10]
     // );
     // exit(1);
 }
@@ -1150,7 +1169,7 @@ void r3000_i_break(r3000_state* cpu) {
 
     DO_PENDING_LOAD;
 
-    r3000_exception(cpu, CAUSE_BP);
+    // r3000_exception(cpu, CAUSE_BP);
 }
 
 void r3000_i_mfhi(r3000_state* cpu) {
@@ -1459,11 +1478,11 @@ void r3000_i_tlbwr(r3000_state* cpu) {
     cpu->tlb[index].lo = cpu->cop0_r[COP0_ENTRYLO];
     cpu->tlb[index].hi = cpu->cop0_r[COP0_ENTRYHI];
 
-    printf("TLB refill index=%08x %08x -> %08x\n",
-        index,
-        cpu->tlb[index].hi,
-        cpu->tlb[index].lo
-    );
+    // printf("TLB refill index=%08x %08x -> %08x\n",
+    //     index,
+    //     cpu->tlb[index].hi,
+    //     cpu->tlb[index].lo
+    // );
 }
 
 // To-do: COP1 (FPU)

@@ -4,7 +4,6 @@
 #include "ctype.h"
 
 void* __ram_start = 0;
-void* __ram_end = 0;
 
 uint8_t __memory[0x1000 * 32];
 __alloc_block __blocks[32];
