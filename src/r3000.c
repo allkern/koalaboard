@@ -482,6 +482,10 @@ void r3000_cycle(r3000_state* cpu) {
 
     g_r3000_primary_table[OP](cpu);
 
+    if (cpu->mmu_exception) {
+        cpu->mmu_exception = 0;
+    }
+
     cpu->last_cycles += 1;
     cpu->total_cycles += cpu->last_cycles;
 
@@ -534,6 +538,15 @@ void r3000_exception(r3000_state* cpu, uint32_t cause) {
     cpu->cop0_r[COP0_CONTEXT] &= ~0x1fffff;
     cpu->cop0_r[COP0_CONTEXT] |= (cpu->cop0_r[COP0_BADVADDR] >> 10) & 0x1ffffc;
 
+    // printf("R3000 exception cause=%08x spc=%08x pc=%08x badvaddr=%08x ctx=%08x eh=%08x\n",
+    //     cause >> 2,
+    //     cpu->saved_pc,
+    //     cpu->pc,
+    //     cpu->cop0_r[COP0_BADVADDR],
+    //     cpu->cop0_r[COP0_CONTEXT],
+    //     cpu->cop0_r[COP0_ENTRYHI]
+    // );
+
     // Save PC at which exception happened
     cpu->cop0_r[COP0_EPC] = cpu->saved_pc;
 
@@ -554,15 +567,6 @@ void r3000_exception(r3000_state* cpu, uint32_t cause) {
     // Set PC to the vector selected on BEV
     cpu->pc = (cpu->cop0_r[COP0_SR] & SR_BEV) ? 0xbfc00180 : 0x80000080;
     cpu->next_pc = cpu->pc + 4;
-
-    printf("R3000 exception cause=%08x spc=%08x pc=%08x badvaddr=%08x ctx=%08x eh=%08x\n",
-        cause >> 2,
-        cpu->saved_pc,
-        cpu->pc,
-        cpu->cop0_r[COP0_BADVADDR],
-        cpu->cop0_r[COP0_CONTEXT],
-        cpu->cop0_r[COP0_ENTRYHI]
-    );
     // printf("BadVaddr=%08x Context=%08x Random=%08x EntryHi=%08x\n",
     //     cpu->cop0_r[8],
     //     cpu->cop0_r[4],
@@ -846,8 +850,13 @@ void r3000_i_lb(r3000_state* cpu) {
 
     DO_PENDING_LOAD;
 
+    uint32_t v = r3000_read8(cpu, s + IMM16S);
+
+    if (cpu->mmu_exception)
+        return;
+
     cpu->load_d = T;
-    cpu->load_v = SE8(r3000_read8(cpu, s + IMM16S));
+    cpu->load_v = SE8(v);
 }
 
 void r3000_i_lh(r3000_state* cpu) {
@@ -857,41 +866,56 @@ void r3000_i_lh(r3000_state* cpu) {
 
     DO_PENDING_LOAD;
 
-    uint32_t addr = s + IMM16S;
+    uint32_t v = r3000_read16(cpu, s + IMM16S);
+
+    if (cpu->mmu_exception)
+        return;
 
     cpu->load_d = T;
-    cpu->load_v = SE16(r3000_read16(cpu, addr));
+    cpu->load_v = SE16(v);
 }
 
 void r3000_i_lwl(r3000_state* cpu) {
     TRACE_M("lwl");
 
-    uint32_t addr = cpu->r[S] + IMM16S;
+    uint32_t rt = T;
+    uint32_t s = cpu->r[S];
+    uint32_t t = cpu->r[rt];
 
-    uint32_t aligned = r3000_read32(cpu, addr & ~0x3);
+    DO_PENDING_LOAD;
 
-    cpu->load_v = cpu->r[T];
+    uint32_t addr = s + IMM16S;
+    uint32_t aligned_addr = addr & 0xFFFFFFFC;
+    uint32_t aligned_load = r3000_read32(cpu, aligned_addr);
 
-    switch (addr & 0x3) {
-        case 0: cpu->load_v = (cpu->load_v & 0x00ffffff) | (aligned << 24); break;
-        case 1: cpu->load_v = (cpu->load_v & 0x0000ffff) | (aligned << 16); break;
-        case 2: cpu->load_v = (cpu->load_v & 0x000000ff) | (aligned << 8 ); break;
-        case 3: cpu->load_v =                               aligned       ; break;
-    }
+    if (cpu->mmu_exception)
+        return;
 
-    cpu->load_d = T;
+    if (rt == cpu->load_d)
+        t = cpu->load_v;
+
+    int shift = (int)((addr & 0x3) << 3);
+    uint32_t mask = (uint32_t)0x00FFFFFF >> shift;
+    uint32_t value = (t & mask) | (aligned_load << (24 - shift)); 
+
+    cpu->load_d = rt;
+    cpu->load_v = value;
 }
 
 void r3000_i_lw(r3000_state* cpu) {
     TRACE_M("lw");
 
     uint32_t s = cpu->r[S];
-    uint32_t addr = s + IMM16S;
 
     DO_PENDING_LOAD;
 
+    uint32_t v = r3000_read32(cpu, s + IMM16S);
+
+    if (cpu->mmu_exception)
+        return;
+
     cpu->load_d = T;
-    cpu->load_v = r3000_read32(cpu, addr);
+    cpu->load_v = v;
 }
 
 void r3000_i_lbu(r3000_state* cpu) {
@@ -901,39 +925,56 @@ void r3000_i_lbu(r3000_state* cpu) {
 
     DO_PENDING_LOAD;
 
+    uint32_t v = r3000_read8(cpu, s + IMM16S);
+
+    if (cpu->mmu_exception)
+        return;
+
     cpu->load_d = T;
-    cpu->load_v = r3000_read8(cpu, s + IMM16S);
+    cpu->load_v = v;
 }
 
 void r3000_i_lhu(r3000_state* cpu) {
     TRACE_M("lhu");
 
     uint32_t s = cpu->r[S];
-    uint32_t addr = s + IMM16S;
 
     DO_PENDING_LOAD;
 
+    uint32_t v = r3000_read16(cpu, s + IMM16S);
+
+    if (cpu->mmu_exception)
+        return;
+
     cpu->load_d = T;
-    cpu->load_v = r3000_read16(cpu, addr);
+    cpu->load_v = v;
 }
 
 void r3000_i_lwr(r3000_state* cpu) {
     TRACE_M("lwr");
 
-    uint32_t addr = cpu->r[S] + IMM16S;
+    uint32_t rt = T;
+    uint32_t s = cpu->r[S];
+    uint32_t t = cpu->r[rt];
 
-    uint32_t aligned = r3000_read32(cpu, addr & ~0x3);
+    DO_PENDING_LOAD;
 
-    cpu->load_v = cpu->r[T];
+    uint32_t addr = s + IMM16S;
+    uint32_t aligned_addr = addr & 0xFFFFFFFC;
+    uint32_t aligned_load = r3000_read32(cpu, aligned_addr);
 
-    switch (addr & 0x3) {
-        case 0: cpu->load_v =                               aligned       ; break;
-        case 1: cpu->load_v = (cpu->load_v & 0xff000000) | (aligned >> 8 ); break;
-        case 2: cpu->load_v = (cpu->load_v & 0xffff0000) | (aligned >> 16); break;
-        case 3: cpu->load_v = (cpu->load_v & 0xffffff00) | (aligned >> 24); break;
-    }
+    if (cpu->mmu_exception)
+        return;
 
-    cpu->load_d = T;
+    if (rt == cpu->load_d)
+        t = cpu->load_v;
+
+    int shift = (int)((addr & 0x3) << 3);
+    uint32_t mask = 0xFFFFFF00 << (24 - shift);
+    uint32_t value = (t & mask) | (aligned_load >> shift); 
+
+    cpu->load_d = rt;
+    cpu->load_v = value;
 }
 
 void r3000_i_sb(r3000_state* cpu) {
@@ -984,6 +1025,9 @@ void r3000_i_swl(r3000_state* cpu) {
     uint32_t aligned = addr & ~0x3;
     uint32_t v = r3000_read32(cpu, aligned);
 
+    if (cpu->mmu_exception)
+        return;
+
     switch (addr & 0x3) {
         case 0: v = (v & 0xffffff00) | (cpu->r[T] >> 24); break;
         case 1: v = (v & 0xffff0000) | (cpu->r[T] >> 16); break;
@@ -1023,6 +1067,9 @@ void r3000_i_swr(r3000_state* cpu) {
     uint32_t addr = s + IMM16S;
     uint32_t aligned = addr & ~0x3;
     uint32_t v = r3000_read32(cpu, aligned);
+
+    if (cpu->mmu_exception)
+        return;
 
     switch (addr & 0x3) {
         case 0: v =                     cpu->r[T]       ; break;
